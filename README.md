@@ -1,36 +1,70 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 行事曆解析系統（PDF → Notion → Google Calendar）
 
-## Getting Started
+一個部署在 Vercel 的全自動行事曆解析系統。
 
-First, run the development server:
+## 功能流程
+
+1. **上傳 PDF** → 支援任意格式的 PDF 文件
+2. **AI 解析** → 使用 Gemini 2.0 Flash 提取行事曆資訊，輸出 Markdown
+3. **預覽確認** → 可編輯 Markdown 內容
+4. **寫入 Notion** → 自動建立 Notion 子頁面
+5. **同步行事曆** → 透過 Google Apps Script 加入 Google 行事曆
+
+## 快速開始
+
+### 1. 複製環境變數
+
+```bash
+cp .env.example .env.local
+```
+
+### 2. 填入 API Keys
+
+編輯 `.env.local`，填入以下資訊：
+
+| 變數 | 說明 | 申請連結 |
+|------|------|---------|
+| `GEMINI_API_KEY` | Gemini API 金鑰 | [aistudio.google.com](https://aistudio.google.com/apikey) |
+| `NOTION_TOKEN` | Notion Integration Token | [notion.so/my-integrations](https://www.notion.so/my-integrations) |
+| `NOTION_PAGE_ID` | 目標 Notion Page ID | 從 Page URL 複製 |
+| `GAS_CALENDAR_URL` | GAS Web App URL | 詳見 gas/README.md |
+| `GAS_SECRET_KEY` | 自訂驗證密鑰 | 自行設定 |
+
+### 3. 設定 Google Apps Script（Google Calendar）
+
+詳見 gas/README.md，約 5 分鐘完成。
+
+### 4. 設定 Notion Integration
+
+1. 前往 notion.so/my-integrations 建立 Integration
+2. 複製 Internal Integration Token → 填入 NOTION_TOKEN
+3. 在目標 Notion Page 右上角「...」→「連線」→ 選擇您的 Integration
+4. 從 Page URL 取得 Page ID → 填入 NOTION_PAGE_ID
+
+### 5. 本地開發
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+打開 http://localhost:3000
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 部署到 Vercel
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm i -g vercel
+vercel
+vercel env add GEMINI_API_KEY
+vercel env add NOTION_TOKEN
+vercel env add NOTION_PAGE_ID
+vercel env add GAS_CALENDAR_URL
+vercel env add GAS_SECRET_KEY
+```
 
-## Learn More
+## 技術棧
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Next.js 14 (App Router)
+- Google Gemini 2.0 Flash API (Multimodal PDF 解析)
+- @notionhq/client
+- Google Apps Script (Calendar)
+- Vercel 部署

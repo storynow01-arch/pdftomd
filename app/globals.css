@@ -1,26 +1,224 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Google Brand Colors */
+  --google-blue: #4285F4;
+  --google-red: #EA4335;
+  --google-yellow: #FBBC05;
+  --google-green: #34A853;
+
+  /* Theme Colors - Light / Cornell Academic Style (預設) */
+  --bg-primary: #FFFFFF;
+  --bg-secondary: #F8F9FA;
+  --bg-card: #FFFFFF;
+  --bg-card-hover: #F1F3F4;
+  
+  --border-subtle: #DADCE0;
+  --border-focus: #4285F4;
+  
+  --text-primary: #202124;
+  --text-secondary: #5F6368;
+  --text-muted: #9AA0A6;
+  
+  --accent-primary: var(--google-blue);
+  --accent-secondary: var(--google-green);
+  --accent-warning: var(--google-red);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+[data-theme="dark"] {
+  --bg-primary: #121212;
+  --bg-secondary: #1E1E1E;
+  --bg-card: #242424;
+  --bg-card-hover: #2A2A2A;
+  
+  --border-subtle: #333333;
+  --border-focus: #8AB4F8;
+  
+  --text-primary: #E8EAED;
+  --text-secondary: #9AA0A6;
+  --text-muted: #5F6368;
+  
+  --accent-primary: #8AB4F8;
+  --accent-secondary: #81C995;
+  --accent-warning: #F28B82;
+  --google-blue: #8AB4F8; /* 覆蓋為暗色版藍色 */
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+[data-theme="ocean"] {
+  --bg-primary: #F0F8FF;
+  --bg-secondary: #E1F0FA;
+  --bg-card: #FFFFFF;
+  --bg-card-hover: #E8F4FC;
+  
+  --border-subtle: #BFE0F5;
+  --border-focus: #2B7A78;
+  
+  --text-primary: #17252A;
+  --text-secondary: #2B7A78;
+  --text-muted: #3AAFA9;
+  
+  --accent-primary: #2B7A78;
+  --accent-secondary: #3AAFA9;
+  --accent-warning: #FE4A90;
+  --google-blue: #2B7A78;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  color: var(--text-primary);
+  background-color: var(--bg-primary);
+  font-family: 'Inter', 'Noto Sans TC', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Cornell Note Layout Utility Classes */
+.cornell-layout {
+  display: grid;
+  grid-template-areas:
+    "header header"
+    "cue notes"
+    "summary summary";
+  grid-template-columns: 300px 1fr; /* 左線索300px，右筆記自適應 */
+  gap: 2rem;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+/* 手機版：左側線索改到上方 */
+@media (max-width: 768px) {
+  .cornell-layout {
+    grid-template-areas:
+      "header"
+      "cue"
+      "notes"
+      "summary";
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+    padding: 1rem;
+  }
+}
+
+.cornell-header {
+  grid-area: header;
+  border-bottom: 2px solid var(--border-subtle);
+  padding-bottom: 1rem;
+  margin-bottom: 1rem;
+}
+
+.cornell-cue {
+  grid-area: cue;
+  border-right: 1px solid var(--border-subtle);
+  padding-right: 1.5rem;
+}
+
+@media (max-width: 768px) {
+  .cornell-cue {
+    border-right: none;
+    border-bottom: 1px solid var(--border-subtle);
+    padding-right: 0;
+    padding-bottom: 1.5rem;
+  }
+}
+
+.cornell-notes {
+  grid-area: notes;
+  min-height: 500px;
+}
+
+.cornell-summary {
+  grid-area: summary;
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 1.5rem;
+  margin-top: 2rem;
+}
+
+/* UI Components */
+.card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 1.5rem;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 2px 0 rgba(60,64,67,0.3), 0 1px 3px 1px rgba(60,64,67,0.15);
+}
+
+.card:hover {
+  box-shadow: 0 1px 3px 0 rgba(60,64,67,0.3), 0 4px 8px 3px rgba(60,64,67,0.15);
+}
+
+.btn-primary {
+  background-color: var(--google-blue);
+  color: white;
+  padding: 0.5rem 1.5rem;
+  border-radius: 4px;
+  font-weight: 500;
+  transition: background-color 0.2s;
+  box-shadow: 0 1px 2px 0 rgba(60,64,67,0.3);
+}
+
+.btn-primary:hover {
+  background-color: #3b78e7;
+}
+
+.btn-primary:disabled {
+  background-color: var(--border-subtle);
+  color: var(--text-muted);
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.btn-secondary {
+  background-color: white;
+  color: var(--google-blue);
+  border: 1px solid var(--border-subtle);
+  padding: 0.5rem 1.5rem;
+  border-radius: 4px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.btn-secondary:hover {
+  background-color: var(--bg-secondary);
+  border-color: var(--border-focus);
+}
+
+/* Markdown Styles */
+.prose {
+  color: var(--text-primary);
+  line-height: 1.6;
+}
+.prose h1, .prose h2, .prose h3 {
+  color: var(--text-primary);
+  font-weight: 600;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+}
+.prose p {
+  margin-bottom: 1em;
+}
+.prose ul {
+  list-style-type: disc;
+  padding-left: 1.5em;
+  margin-bottom: 1em;
+}
+.prose code {
+  background-color: var(--bg-secondary);
+  padding: 0.2em 0.4em;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.9em;
+  color: var(--google-red);
+}
+.prose pre {
+  background-color: var(--bg-secondary);
+  padding: 1rem;
+  border-radius: 8px;
+  overflow-x: auto;
+  border: 1px solid var(--border-subtle);
+}
+.prose pre code {
+  background-color: transparent;
+  color: inherit;
+  padding: 0;
 }
