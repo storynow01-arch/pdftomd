@@ -293,7 +293,7 @@ export default function CalendarPage() {
 
       {/* Notes */}
       <main className="cornell-notes">
-        <div className="card" style={{ height: '100%', minHeight: '500px' }}>
+        <div className="card" style={{ height: '100%', minHeight: '500px', paddingBottom: '1rem' }}>
 
           {/* 單位分頁 Tab */}
           {units.length > 0 && (
@@ -432,23 +432,51 @@ export default function CalendarPage() {
         </div>
       </main>
 
-      {/* Summary */}
-      <footer className="cornell-summary" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <button className="btn-secondary" onClick={() => router.push('/preview')}>
+      {/* 浮動按鈕（右下角 fixed） */}
+      <div style={{
+        position: 'fixed',
+        bottom: '2rem',
+        right: '2rem',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'flex-end',
+        gap: '0.6rem',
+        zIndex: 1000,
+      }}>
+        {/* 錯誤訊息 */}
+        {error && (
+          <div style={{
+            padding: '0.5rem 1rem',
+            borderRadius: '8px',
+            backgroundColor: 'rgba(234,67,53,0.1)',
+            border: '1px solid var(--google-red)',
+            fontSize: '0.9rem',
+            color: 'var(--google-red)',
+            backdropFilter: 'blur(8px)',
+          }}>
+            ⚠️ {error}
+          </div>
+        )}
+
+        {/* 次要：返回預覽 */}
+        <button
+          className="btn-secondary"
+          onClick={() => router.push('/preview')}
+          style={{ boxShadow: '0 2px 10px rgba(0,0,0,0.12)', backdropFilter: 'blur(8px)', padding: '0.55rem 1.1rem', fontSize: '0.9rem' }}
+        >
           ← 返回預覽
         </button>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          {error && <span style={{ color: 'var(--google-red)' }}>⚠️ {error}</span>}
-          <button
-            className="btn-primary"
-            style={{ backgroundColor: 'var(--google-green)' }}
-            onClick={handleSync}
-            disabled={loading || selected.size === 0}
-          >
-            {loading ? '同步中...' : `📅 加入 ${selected.size} 個事件`}
-          </button>
-        </div>
-      </footer>
+
+        {/* 主要：加入行事曆 */}
+        <button
+          className="btn-primary"
+          style={{ backgroundColor: 'var(--google-green)', boxShadow: '0 4px 16px rgba(52,168,83,0.45)', padding: '0.75rem 1.5rem', fontSize: '1rem' }}
+          onClick={handleSync}
+          disabled={loading || selected.size === 0}
+        >
+          {loading ? '同步中...' : `📅 加入 ${selected.size} 個事件`}
+        </button>
+      </div>
     </div>
   );
 }
