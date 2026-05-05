@@ -173,11 +173,33 @@ export default function HomePage() {
               ⚠️ {error}
             </div>
           )}
+          {loading && (
+            <div style={{ marginTop: '1.5rem', textAlign: 'center' }}>
+              <p style={{ color: 'var(--google-blue)', fontWeight: 600, marginBottom: '0.5rem' }}>
+                🤖 AI 正在智能解析行事曆內容，請稍候...
+              </p>
+              <div style={{ width: '100%', height: '8px', backgroundColor: 'var(--bg-secondary)', borderRadius: '4px', overflow: 'hidden', position: 'relative' }}>
+                <div style={{
+                  position: 'absolute', top: 0, left: 0, height: '100%', width: '30%',
+                  backgroundColor: 'var(--google-blue)',
+                  borderRadius: '4px',
+                  animation: 'indeterminateProgress 1.5s infinite ease-in-out'
+                }} />
+              </div>
+              <style>{`
+                @keyframes indeterminateProgress {
+                  0% { left: -30%; width: 30%; }
+                  50% { left: 30%; width: 70%; }
+                  100% { left: 100%; width: 30%; }
+                }
+              `}</style>
+            </div>
+          )}
         </div>
       </main>
 
-      {/* 下方總結區：動作按鈕 */}
-      <footer className="cornell-summary" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
+      {/* 下方總結區：動作按鈕移到左側 */}
+      <footer className="cornell-summary" style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center' }}>
         <button
           className="btn-primary"
           onClick={handleParse}
