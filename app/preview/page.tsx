@@ -150,8 +150,8 @@ export default function PreviewPage() {
       if (!res.ok) throw new Error(data.error);
       sessionStorage.setItem('notionPageUrl', data.pageUrl);
       sessionStorage.setItem('notionPageId', data.pageId);
-      // 行事曆頁只顯示所選單位事件
-      sessionStorage.setItem('confirmedMarkdown', getSelectedMarkdown());
+      // 行事曆頁面仍使用全部事件（不受單位篩選影響），但保留使用者的編輯
+      sessionStorage.setItem('confirmedMarkdown', getFullMarkdown());
       setSuccess('✅ 已寫入 Notion！');
       setTimeout(() => router.push('/calendar'), 1500);
     } catch (err: unknown) {
@@ -163,8 +163,8 @@ export default function PreviewPage() {
 
   // ── 跳過 Notion ────────────────────────────────────────────
   const handleSkipNotion = () => {
-    // 行事曆頁只顯示所選單位事件
-    sessionStorage.setItem('confirmedMarkdown', getSelectedMarkdown());
+    // 行事曆頁面仍使用全部事件（不受單位篩選影響），但保留使用者的編輯
+    sessionStorage.setItem('confirmedMarkdown', getFullMarkdown());
     sessionStorage.removeItem('notionPageUrl');
     sessionStorage.removeItem('notionPageId');
     router.push('/calendar');
