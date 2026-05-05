@@ -142,16 +142,20 @@ export default function HomePage() {
         </h2>
         <ul style={{ listStyle: 'none', padding: 0, margin: 0, color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
           <li style={{ marginBottom: '1rem', display: 'flex', gap: '0.5rem' }}>
-            <span style={{ color: 'var(--google-red)' }}>📍</span>
-            <span>支援各式 PDF 格式（包含圖片掃描檔或文字排版）。</span>
+            <span style={{ color: 'var(--google-red)' }}>📄</span>
+            <span>支援各式 PDF 格式，包含圖片掃描檔或文字排版。</span>
           </li>
           <li style={{ marginBottom: '1rem', display: 'flex', gap: '0.5rem' }}>
-            <span style={{ color: 'var(--google-yellow)' }}>📍</span>
-            <span>系統將使用 Gemini 2.0 AI 進行智能辨識。</span>
+            <span style={{ color: 'var(--google-blue)' }}>🧠</span>
+            <span>系統使用高效能 <strong>Gemini 2.5 Flash</strong> 模型進行智能辨識。</span>
           </li>
           <li style={{ marginBottom: '1rem', display: 'flex', gap: '0.5rem' }}>
-            <span style={{ color: 'var(--google-green)' }}>📍</span>
-            <span>解析過程約需 10~30 秒，請耐心等候。</span>
+            <span style={{ color: 'var(--google-yellow)' }}>⏳</span>
+            <span>解析過程約需 10~30 秒，進度條完成後將自動跳轉。</span>
+          </li>
+          <li style={{ marginBottom: '1rem', display: 'flex', gap: '0.5rem' }}>
+            <span style={{ color: 'var(--google-green)' }}>🔄</span>
+            <span>流程：預覽校對 ➔ 單位複選 ➔ 同步 Notion ➔ 匯入行事曆。</span>
           </li>
         </ul>
 
