@@ -169,7 +169,7 @@ body {
 }
 
 .btn-secondary {
-  background-color: white;
+  background-color: var(--bg-card);
   color: var(--google-blue);
   border: 1px solid var(--border-subtle);
   padding: 0.5rem 1.5rem;

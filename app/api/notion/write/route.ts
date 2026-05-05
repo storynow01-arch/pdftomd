@@ -16,30 +16,70 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '未設定 NOTION_PAGE_ID' }, { status: 500 });
     }
 
-    // 建立頁面標題（使用日期）
     const pageTitle = title || `行事曆解析 - ${new Date().toLocaleDateString('zh-TW')}`;
 
-    // 將 Markdown 轉換為 Notion Block 格式
-    const blocks = markdownToNotionBlocks(markdown);
+    // 解析 Markdown 成結構化資料：[{ unitName, events: [{ eventTitle, detailLines[] }] }]
+    const unitSections = parseMarkdownToSections(markdown);
 
-    // 在指定 Page 下建立子頁面
+    // Step 1：建立空頁面（不含任何 children，避免超過 1000 block 限制）
     const response = await notion.pages.create({
-      parent: {
-        type: 'page_id',
-        page_id: process.env.NOTION_PAGE_ID,
-      },
+      parent: { type: 'page_id', page_id: process.env.NOTION_PAGE_ID },
       properties: {
         title: {
-          title: [
-            {
-              type: 'text',
-              text: { content: pageTitle },
-            },
-          ],
+          title: [{ type: 'text', text: { content: pageTitle } }],
         },
       },
-      children: blocks,
+      children: [],
     });
+
+    const pageId = response.id;
+
+    // Step 2：為每個單位建立一個空的 Toggle Heading 2，取得其 block_id
+    //         再逐一 append 事件到該 Toggle 的 children
+    for (const unit of unitSections) {
+      // 建立單位的 Toggle Heading 2（空的，先佔位）
+      const unitToggleRes = await notion.blocks.children.append({
+        block_id: pageId,
+        children: [
+          {
+            object: 'block',
+            type: 'heading_2',
+            heading_2: {
+              rich_text: [{ type: 'text', text: { content: `單位：${unit.unitName}` } }],
+              is_toggleable: true,
+            },
+          } as Parameters<typeof notion.blocks.children.append>[0]['children'][0],
+        ],
+      });
+
+      const unitToggleId = (unitToggleRes.results[0] as { id: string }).id;
+
+      // 將該單位下所有事件的 Toggle Heading 3，分批 append（每批最多 100 個）
+      const eventToggleBlocks = unit.events.map((event) => ({
+        object: 'block' as const,
+        type: 'heading_3' as const,
+        heading_3: {
+          rich_text: [{ type: 'text' as const, text: { content: event.eventTitle } }],
+          is_toggleable: true,
+          children: event.detailLines.map((line) => ({
+            object: 'block' as const,
+            type: 'bulleted_list_item' as const,
+            bulleted_list_item: { rich_text: parseBoldMarkdown(line) },
+          })),
+        },
+      }));
+
+      // 每次最多 append 10 個 Toggle Heading 3（每個含最多 6 個子項，安全起見保守批次）
+      for (let i = 0; i < eventToggleBlocks.length; i += 10) {
+        const batch = eventToggleBlocks.slice(i, i + 10);
+        await notion.blocks.children.append({
+          block_id: unitToggleId,
+          children: batch as Parameters<typeof notion.blocks.children.append>[0]['children'],
+        });
+      }
+    }
+
+    console.log(`[Notion] 完成寫入：${unitSections.length} 個單位，共 ${unitSections.reduce((acc, u) => acc + u.events.length, 0)} 個事件`);
 
     return NextResponse.json({
       success: true,
@@ -57,105 +97,45 @@ export async function POST(request: NextRequest) {
   }
 }
 
-/**
- * 將 Markdown 文字轉換為 Notion Block 格式
- * 支援：標題（H1-H3）、粗體項目、一般段落、水平線
- */
-function markdownToNotionBlocks(markdown: string) {
-  const lines = markdown.split('\n');
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const blocks: any[] = [];
-  let i = 0;
+/** 解析 Markdown 成結構化資料 */
+function parseMarkdownToSections(markdown: string) {
+  const result: {
+    unitName: string;
+    events: { eventTitle: string; detailLines: string[] }[];
+  }[] = [];
 
-  while (i < lines.length) {
-    const line = lines[i];
+  const unitSections = markdown.split(/(?=^## 單位：)/m).filter(s => s.trim());
 
-    // 跳過空行
-    if (line.trim() === '') {
-      i++;
-      continue;
+  unitSections.forEach(section => {
+    const unitMatch = section.match(/^## 單位：(.*?)$/m);
+    const unitName = unitMatch ? unitMatch[1].trim() : '其他';
+
+    const events: { eventTitle: string; detailLines: string[] }[] = [];
+    const eventBlocks = section.split(/(?=^### )/m);
+
+    eventBlocks.forEach(block => {
+      if (!block.trim().startsWith('### ')) return;
+      const lines = block.split('\n');
+      const eventTitle = lines[0].replace(/^### /, '').trim();
+      if (!eventTitle) return;
+
+      const detailLines = lines
+        .slice(1)
+        .filter(l => l.startsWith('- '))
+        .map(l => l.replace(/^- /, '').trim());
+
+      events.push({ eventTitle, detailLines });
+    });
+
+    if (events.length > 0) {
+      result.push({ unitName, events });
     }
+  });
 
-    // H2 標題（事件標題）
-    if (line.startsWith('## ')) {
-      blocks.push({
-        object: 'block',
-        type: 'heading_2',
-        heading_2: {
-          rich_text: [{ type: 'text', text: { content: line.replace('## ', '') } }],
-        },
-      });
-      i++;
-      continue;
-    }
-
-    // H3 標題
-    if (line.startsWith('### ')) {
-      blocks.push({
-        object: 'block',
-        type: 'heading_3',
-        heading_3: {
-          rich_text: [{ type: 'text', text: { content: line.replace('### ', '') } }],
-        },
-      });
-      i++;
-      continue;
-    }
-
-    // H1 標題
-    if (line.startsWith('# ')) {
-      blocks.push({
-        object: 'block',
-        type: 'heading_1',
-        heading_1: {
-          rich_text: [{ type: 'text', text: { content: line.replace('# ', '') } }],
-        },
-      });
-      i++;
-      continue;
-    }
-
-    // 水平線
-    if (line.trim() === '---' || line.trim() === '***') {
-      blocks.push({ object: 'block', type: 'divider', divider: {} });
-      i++;
-      continue;
-    }
-
-    // 列表項目（- **key**：value 格式）
-    if (line.startsWith('- ')) {
-      const content = line.replace('- ', '');
-      const richText = parseBoldMarkdown(content);
-      blocks.push({
-        object: 'block',
-        type: 'bulleted_list_item',
-        bulleted_list_item: { rich_text: richText },
-      });
-      i++;
-      continue;
-    }
-
-    // 一般段落
-    if (line.trim()) {
-      blocks.push({
-        object: 'block',
-        type: 'paragraph',
-        paragraph: {
-          rich_text: parseBoldMarkdown(line),
-        },
-      });
-    }
-
-    i++;
-  }
-
-  // Notion 單次最多 100 個 block
-  return blocks.slice(0, 100);
+  return result;
 }
 
-/**
- * 解析 Markdown 粗體（**text**）為 Notion rich_text 格式
- */
+/** 解析 Markdown 粗體（**text**）為 Notion rich_text 格式 */
 function parseBoldMarkdown(text: string) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const richText: any[] = [];
@@ -169,10 +149,7 @@ function parseBoldMarkdown(text: string) {
         annotations: { bold: true },
       });
     } else if (part) {
-      richText.push({
-        type: 'text',
-        text: { content: part },
-      });
+      richText.push({ type: 'text', text: { content: part } });
     }
   });
 

@@ -23,7 +23,7 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="min-h-screen bg-white text-black antialiased" suppressHydrationWarning>
+      <body className="min-h-screen antialiased" suppressHydrationWarning>
         <ThemeSwitcher />
         <div style={{ position: 'relative', zIndex: 1 }}>
           {children}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 
 interface CalendarEvent {
@@ -11,6 +11,7 @@ interface CalendarEvent {
   isAllDay?: boolean;
   description?: string;
   location?: string;
+  unit?: string; // 所屬單位
 }
 
 function StepIndicator({ current }: { current: number }) {
@@ -45,7 +46,7 @@ function StepIndicator({ current }: { current: number }) {
   );
 }
 
-/** 從 Markdown 文字中解析出事件列表 */
+/** 從 Markdown 文字中解析出事件列表（含單位資訊） */
 function parseEventsFromMarkdown(md: string): CalendarEvent[] {
   const events: CalendarEvent[] = [];
   
@@ -55,7 +56,8 @@ function parseEventsFromMarkdown(md: string): CalendarEvent[] {
   sections.forEach((section, secIdx) => {
     // 找出單位名稱
     const unitMatch = section.match(/^## 單位：(.*?)$/m);
-    const unitPrefix = unitMatch ? `【${unitMatch[1].trim().replace(/【|】/g, '')}】` : '';
+    const unitRaw = unitMatch ? unitMatch[1].trim().replace(/【|】/g, '') : '';
+    const unitPrefix = unitRaw ? `【${unitRaw}】` : '';
 
     // 2. 依據事件切分
     const eventBlocks = section.split(/(?=^### )/m);
@@ -108,6 +110,7 @@ function parseEventsFromMarkdown(md: string): CalendarEvent[] {
         isAllDay,
         location,
         description,
+        unit: unitRaw || '其他',
       });
     });
   });
@@ -123,6 +126,44 @@ export default function CalendarPage() {
   const [loading, setLoading] = useState(false);
   const [synced, setSynced] = useState(false);
   const [error, setError] = useState('');
+  const [searchKeyword, setSearchKeyword] = useState('');
+  const [activeUnit, setActiveUnit] = useState<string>('全部'); // 當前選中的單位分頁
+
+  // 從事件中提取所有單位名稱
+  const units = useMemo(() => {
+    const unitSet = new Set<string>();
+    events.forEach(e => { if (e.unit) unitSet.add(e.unit); });
+    return Array.from(unitSet);
+  }, [events]);
+
+  // 依據分頁 + 關鍵字篩選事件（不影響勾選狀態）
+  const filteredEvents = useMemo(() => {
+    let filtered = events;
+    
+    // 先依單位篩選
+    if (activeUnit !== '全部') {
+      filtered = filtered.filter(e => e.unit === activeUnit);
+    }
+    
+    // 再依關鍵字篩選
+    if (searchKeyword.trim()) {
+      const lower = searchKeyword.toLowerCase();
+      filtered = filtered.filter(e =>
+        e.title.toLowerCase().includes(lower) ||
+        e.startTime.includes(lower) ||
+        e.endTime.includes(lower) ||
+        (e.location && e.location.toLowerCase().includes(lower)) ||
+        (e.description && e.description.toLowerCase().includes(lower))
+      );
+    }
+    
+    return filtered;
+  }, [events, activeUnit, searchKeyword]);
+
+  // 當前分頁下被選中的事件數
+  const selectedInTab = useMemo(() => {
+    return filteredEvents.filter(e => selected.has(e.id)).length;
+  }, [filteredEvents, selected]);
 
   useEffect(() => {
     const md = sessionStorage.getItem('confirmedMarkdown');
@@ -141,6 +182,23 @@ export default function CalendarPage() {
       return next;
     });
   }, []);
+
+  // 全選/取消全選：只影響當前分頁顯示的事件
+  const selectAllInTab = useCallback(() => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      filteredEvents.forEach(e => next.add(e.id));
+      return next;
+    });
+  }, [filteredEvents]);
+
+  const deselectAllInTab = useCallback(() => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      filteredEvents.forEach(e => next.delete(e.id));
+      return next;
+    });
+  }, [filteredEvents]);
 
   const handleSync = async () => {
     const toSync = events.filter((e) => selected.has(e.id));
@@ -216,6 +274,10 @@ export default function CalendarPage() {
             <span style={{ color: 'var(--google-yellow)' }}>💡</span>
             <span>點擊事件卡片即可取消或勾選。</span>
           </li>
+          <li style={{ marginBottom: '1rem', display: 'flex', gap: '0.5rem' }}>
+            <span style={{ color: 'var(--google-blue)' }}>📋</span>
+            <span>使用分頁切換不同單位的事件。</span>
+          </li>
         </ul>
         
         {notionUrl && (
@@ -232,28 +294,101 @@ export default function CalendarPage() {
       {/* Notes */}
       <main className="cornell-notes">
         <div className="card" style={{ height: '100%', minHeight: '500px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', paddingBottom: '1rem', borderBottom: '1px solid var(--border-subtle)' }}>
-            <span style={{ fontWeight: 600 }}>共 {events.length} 個事件 (已選 {selected.size})</span>
-            <div style={{ display: 'flex', gap: '1rem' }}>
+
+          {/* 單位分頁 Tab */}
+          {units.length > 0 && (
+            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', overflowX: 'auto', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border-subtle)' }}>
+              <button
+                onClick={() => setActiveUnit('全部')}
+                style={{
+                  padding: '0.5rem 1rem',
+                  borderRadius: '20px',
+                  border: 'none',
+                  backgroundColor: activeUnit === '全部' ? 'var(--google-blue)' : 'var(--bg-secondary)',
+                  color: activeUnit === '全部' ? 'white' : 'var(--text-secondary)',
+                  fontWeight: activeUnit === '全部' ? 'bold' : 'normal',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                📋 全部
+              </button>
+              {units.map((unit) => (
+                <button
+                  key={unit}
+                  onClick={() => setActiveUnit(unit)}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    borderRadius: '20px',
+                    border: 'none',
+                    backgroundColor: activeUnit === unit ? 'var(--google-blue)' : 'var(--bg-secondary)',
+                    color: activeUnit === unit ? 'white' : 'var(--text-secondary)',
+                    fontWeight: activeUnit === unit ? 'bold' : 'normal',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  {unit}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* 統計 + 全選/取消全選 */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', paddingBottom: '1rem', borderBottom: '1px solid var(--border-subtle)', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <span style={{ fontWeight: 600, fontSize: '0.95rem' }}>
+              {activeUnit === '全部' ? `共 ${events.length} 個事件` : `${activeUnit} ${filteredEvents.length} 個事件`}
+              {' '}(本頁已選 {selectedInTab})
+              {searchKeyword && ` / 篩選出 ${filteredEvents.length} 筆`}
+            </span>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
               <button
                 className="btn-secondary"
                 style={{ padding: '0.25rem 0.75rem', fontSize: '0.85rem' }}
-                onClick={() => setSelected(new Set(events.map((e) => e.id)))}
+                onClick={selectAllInTab}
               >
-                全選
+                本頁全選
               </button>
               <button
                 className="btn-secondary"
                 style={{ padding: '0.25rem 0.75rem', fontSize: '0.85rem' }}
-                onClick={() => setSelected(new Set())}
+                onClick={deselectAllInTab}
               >
-                取消全選
+                本頁取消
               </button>
             </div>
           </div>
 
+          {/* 搜尋篩選框 */}
+          <div style={{ marginBottom: '1rem', position: 'relative' }}>
+            <span style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.9rem', color: 'var(--text-muted)' }}>🔍</span>
+            <input
+              id="calendar-event-search"
+              type="text"
+              value={searchKeyword}
+              onChange={(e) => setSearchKeyword(e.target.value)}
+              placeholder="搜尋事件（標題、日期、地點...）"
+              style={{
+                width: '100%',
+                padding: '0.5rem 0.75rem 0.5rem 2.2rem',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: '20px',
+                fontSize: '0.9rem',
+                outline: 'none',
+                backgroundColor: 'var(--bg-secondary)',
+                color: 'var(--text-primary)',
+                transition: 'border-color 0.2s',
+              }}
+              onFocus={(e) => { e.target.style.borderColor = 'var(--border-focus)'; }}
+              onBlur={(e) => { e.target.style.borderColor = 'var(--border-subtle)'; }}
+            />
+          </div>
+
+          {/* 事件列表 */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {events.map((event) => (
+            {filteredEvents.map((event) => (
               <div
                 key={event.id}
                 onClick={() => toggleSelect(event.id)}
@@ -288,9 +423,9 @@ export default function CalendarPage() {
                 </div>
               </div>
             ))}
-            {events.length === 0 && (
+            {filteredEvents.length === 0 && (
               <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
-                無可解析的事件，請確認 Markdown 格式是否正確。
+                {events.length === 0 ? '無可解析的事件，請確認 Markdown 格式是否正確。' : '目前篩選條件下沒有符合的事件。'}
               </div>
             )}
           </div>
