@@ -238,7 +238,7 @@ export default function PreviewPage() {
                   transition: 'all 0.18s ease',
                 }}
               >
-                📋 全部
+                📋 全部 ({sections.reduce((acc, s) => acc + (s.content.match(/^### /gm)?.length || 0), 0)})
               </button>
 
               {/* 各單位 Tab（複選） */}
@@ -261,7 +261,7 @@ export default function PreviewPage() {
                       position: 'relative',
                     }}
                   >
-                    {section.unit}
+                    {section.unit} <span style={{ opacity: 0.85, fontSize: '0.85em', marginLeft: '0.15rem' }}>({section.content.match(/^### /gm)?.length || 0})</span>
                     {/* 已選角標 */}
                     {isSelected && (
                       <span style={{

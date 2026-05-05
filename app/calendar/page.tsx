@@ -312,27 +312,30 @@ export default function CalendarPage() {
                   transition: 'all 0.2s ease'
                 }}
               >
-                📋 全部
+                📋 全部 <span style={{ opacity: 0.85, fontSize: '0.85em', marginLeft: '0.15rem' }}>({events.length})</span>
               </button>
-              {units.map((unit) => (
-                <button
-                  key={unit}
-                  onClick={() => setActiveUnit(unit)}
-                  style={{
-                    padding: '0.5rem 1rem',
-                    borderRadius: '20px',
-                    border: 'none',
-                    backgroundColor: activeUnit === unit ? 'var(--google-blue)' : 'var(--bg-secondary)',
-                    color: activeUnit === unit ? 'white' : 'var(--text-secondary)',
-                    fontWeight: activeUnit === unit ? 'bold' : 'normal',
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap',
-                    transition: 'all 0.2s ease'
-                  }}
-                >
-                  {unit}
-                </button>
-              ))}
+              {units.map((unit) => {
+                const count = events.filter(e => e.unit === unit).length;
+                return (
+                  <button
+                    key={unit}
+                    onClick={() => setActiveUnit(unit)}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      borderRadius: '20px',
+                      border: 'none',
+                      backgroundColor: activeUnit === unit ? 'var(--google-blue)' : 'var(--bg-secondary)',
+                      color: activeUnit === unit ? 'white' : 'var(--text-secondary)',
+                      fontWeight: activeUnit === unit ? 'bold' : 'normal',
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    {unit} <span style={{ opacity: 0.85, fontSize: '0.85em', marginLeft: '0.15rem' }}>({count})</span>
+                  </button>
+                );
+              })}
             </div>
           )}
 
