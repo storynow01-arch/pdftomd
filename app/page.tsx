@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
 // ── 步驟指示器 ──────────────────────────────────────────────
@@ -42,6 +42,7 @@ export default function HomePage() {
   const [isDragging, setIsDragging] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [error, setError] = useState('');
 
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -66,6 +67,37 @@ export default function HomePage() {
     }
   };
 
+  const [progressText, setProgressText] = useState('');
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (loading) {
+      setProgress(0);
+      setProgressText('正在平行發送初次解析請求...');
+      
+      interval = setInterval(() => {
+        setProgress((prev) => {
+          if (prev >= 95) return 95;
+          // 對數遞減增長：越靠近 95 增加越慢
+          // 期望在前 15 秒達到 60%，在後 30 秒慢慢從 60% 爬到 95%
+          const remaining = 95 - prev;
+          const increment = (remaining * 0.05) + (Math.random() * 0.5);
+          const newProgress = Math.min(prev + increment, 95);
+          
+          if (newProgress > 60 && prev <= 60) {
+            setProgressText('正在進行 AI 交叉比對以提高準確率...');
+          }
+          
+          return newProgress;
+        });
+      }, 500);
+    } else {
+      setProgress(0);
+      setProgressText('');
+    }
+    return () => clearInterval(interval);
+  }, [loading]);
+
   const handleParse = async () => {
     if (!file) return;
     setLoading(true);
@@ -75,14 +107,31 @@ export default function HomePage() {
       formData.append('file', file);
       const res = await fetch('/api/pdf/parse', { method: 'POST', body: formData });
       const data = await res.json();
+      
       if (!res.ok) throw new Error(data.error);
-      // 存入 sessionStorage，傳給下一頁
-      sessionStorage.setItem('parsedMarkdown', data.markdown);
-      sessionStorage.setItem('sourceFilename', data.filename);
-      router.push('/preview');
+
+      // 設定進度到 100%
+      setProgress(100);
+      
+      // 稍微延遲一下讓使用者看到 100% 的狀態再跳轉
+      setTimeout(() => {
+        // 存入 sessionStorage，傳給下一頁
+        sessionStorage.setItem('parsedMarkdown', data.markdown);
+        sessionStorage.setItem('sourceFilename', data.filename);
+        
+        // 如果使用了備用模型，把資訊存入，讓前端顯示警告
+        if (data.isFallback) {
+          sessionStorage.setItem('isFallbackModel', 'true');
+          sessionStorage.setItem('usedModel', data.usedModel);
+        } else {
+          sessionStorage.removeItem('isFallbackModel');
+        }
+
+        router.push('/preview');
+      }, 500);
+
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : '解析失敗，請重試');
-    } finally {
       setLoading(false);
     }
   };
@@ -107,18 +156,34 @@ export default function HomePage() {
         </h2>
         <ul style={{ listStyle: 'none', padding: 0, margin: 0, color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
           <li style={{ marginBottom: '1rem', display: 'flex', gap: '0.5rem' }}>
-            <span style={{ color: 'var(--google-red)' }}>📍</span>
-            <span>支援各式 PDF 格式（包含圖片掃描檔或文字排版）。</span>
+            <span style={{ color: 'var(--google-red)' }}>📄</span>
+            <span>支援各式 PDF 格式，包含圖片掃描檔或文字排版。</span>
           </li>
           <li style={{ marginBottom: '1rem', display: 'flex', gap: '0.5rem' }}>
-            <span style={{ color: 'var(--google-yellow)' }}>📍</span>
-            <span>系統將使用 Gemini 2.0 AI 進行智能辨識。</span>
+            <span style={{ color: 'var(--google-blue)' }}>🧠</span>
+            <span>系統使用高效能 <strong>Gemini 2.5 Flash</strong> 模型進行智能辨識。</span>
           </li>
           <li style={{ marginBottom: '1rem', display: 'flex', gap: '0.5rem' }}>
-            <span style={{ color: 'var(--google-green)' }}>📍</span>
-            <span>解析過程約需 10~30 秒，請耐心等候。</span>
+            <span style={{ color: 'var(--google-yellow)' }}>⏳</span>
+            <span>解析過程約需 10~30 秒，進度條完成後將自動跳轉。</span>
+          </li>
+          <li style={{ marginBottom: '1rem', display: 'flex', gap: '0.5rem' }}>
+            <span style={{ color: 'var(--google-green)' }}>🔄</span>
+            <span>流程：預覽校對 ➔ 單位複選 ➔ 同步 Notion ➔ 匯入行事曆。</span>
           </li>
         </ul>
+
+        {/* 將執行按鈕移到提示區下方 */}
+        <div style={{ marginTop: '2rem' }}>
+          <button
+            className="btn-primary"
+            onClick={handleParse}
+            disabled={!file || loading}
+            style={{ width: '100%', fontSize: '1.05rem', padding: '0.75rem 1rem', boxShadow: '0 4px 16px rgba(66,133,244,0.3)' }}
+          >
+            {loading ? '🤖 解析中...' : '開始解析 →'}
+          </button>
+        </div>
       </aside>
 
       {/* 右側核心區：Dropzone */}
@@ -173,42 +238,28 @@ export default function HomePage() {
               ⚠️ {error}
             </div>
           )}
+          
+          {/* 百分比進度條 */}
           {loading && (
             <div style={{ marginTop: '1.5rem', textAlign: 'center' }}>
               <p style={{ color: 'var(--google-blue)', fontWeight: 600, marginBottom: '0.5rem' }}>
-                🤖 AI 正在智能解析行事曆內容，請稍候...
+                🤖 {progress === 100 ? '解析完成，即將跳轉...' : progressText} ({Math.round(progress)}%)
               </p>
               <div style={{ width: '100%', height: '8px', backgroundColor: 'var(--bg-secondary)', borderRadius: '4px', overflow: 'hidden', position: 'relative' }}>
                 <div style={{
-                  position: 'absolute', top: 0, left: 0, height: '100%', width: '30%',
+                  position: 'absolute', top: 0, left: 0, height: '100%',
+                  width: `${progress}%`,
                   backgroundColor: 'var(--google-blue)',
                   borderRadius: '4px',
-                  animation: 'indeterminateProgress 1.5s infinite ease-in-out'
+                  transition: 'width 0.3s ease'
                 }} />
               </div>
-              <style>{`
-                @keyframes indeterminateProgress {
-                  0% { left: -30%; width: 30%; }
-                  50% { left: 30%; width: 70%; }
-                  100% { left: 100%; width: 30%; }
-                }
-              `}</style>
             </div>
           )}
         </div>
       </main>
 
-      {/* 下方總結區：動作按鈕移到左側 */}
-      <footer className="cornell-summary" style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center' }}>
-        <button
-          className="btn-primary"
-          onClick={handleParse}
-          disabled={!file || loading}
-          style={{ fontSize: '1.1rem', padding: '0.75rem 2rem' }}
-        >
-          {loading ? '🤖 AI 智能解析中...' : '開始解析 →'}
-        </button>
-      </footer>
+      {/* footer 已經不需要了，移除以保持版面簡潔 */}
     </div>
   );
 }

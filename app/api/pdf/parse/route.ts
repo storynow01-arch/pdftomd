@@ -10,15 +10,31 @@ const pdfParseModule = require('pdf-parse');
 const pdfParse: (buffer: Buffer) => Promise<{ text: string; numpages: number }> =
   typeof pdfParseModule === 'function' ? pdfParseModule : (pdfParseModule.default ?? pdfParseModule);
 
-// 使用新版官方 SDK
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+// 解析 API Keys（支援多組，以逗號分隔）
+const apiKeys = (process.env.GEMINI_API_KEY || '')
+  .split(',')
+  .map(k => k.trim())
+  .filter(k => k);
 
-// 模型優先順序：2.5 繁忙時，退回到有高配額的 Gemma 3 模型
-const MODELS = [
+let currentKeyIndex = 0;
+
+function getNextAIClient() {
+  if (apiKeys.length === 0) {
+    throw new Error('Server Configuration Error: GEMINI_API_KEY is missing.');
+  }
+  const key = apiKeys[currentKeyIndex];
+  currentKeyIndex = (currentKeyIndex + 1) % apiKeys.length;
+  console.log(`[API Key 輪詢] 目前使用第 ${currentKeyIndex === 0 ? apiKeys.length : currentKeyIndex} 組 Key`);
+  return new GoogleGenAI({ apiKey: key });
+}
+
+// 模型優先順序：優先讀取環境變數，預設使用 gemini-3-flash-preview
+const defaultModel = process.env.GEMINI_MODEL || 'gemini-3-flash-preview';
+const MODELS = Array.from(new Set([
+  defaultModel,
   'gemini-2.5-flash',
-  'gemma-3-27b-it',
   'gemini-flash-latest'
-];
+]));
 
 const buildPrompt = (pdfText: string, filename: string) => `你是一個行事曆解析助手。請分析以下從 PDF 提取的文字內容，找出所有行事曆相關資訊（活動、行程、時間、日期、地點等）。
 
@@ -115,20 +131,67 @@ export async function POST(request: NextRequest) {
 
     // Step 2: 將提取的文字傳給 Gemini API 分析
     const prompt = buildPrompt(pdfText, file.name);
+    // 獨立出單次解析函式
+    const runParsingPass = async (modelName: string): Promise<string> => {
+      const ai = getNextAIClient();
+      const response = await ai.models.generateContent({
+        model: modelName,
+        contents: prompt,
+      });
+      return response.text ?? '';
+    };
+
     let markdownContent = '';
     let lastError: Error | null = null;
 
     for (const modelName of MODELS) {
       try {
-        console.log(`[PDF 解析] 嘗試模型：${modelName}`);
+        console.log(`[PDF 解析] 嘗試模型：${modelName} (雙軌並行)`);
         
-        const response = await ai.models.generateContent({
-          model: modelName,
-          contents: prompt,
-        });
+        // 雙軌並行發送
+        const [resA, resB] = await Promise.allSettled([
+          runParsingPass(modelName),
+          runParsingPass(modelName)
+        ]);
 
-        markdownContent = response.text ?? '';
-        console.log(`[PDF 解析] 成功，使用：${modelName}`);
+        const validResults: string[] = [];
+        if (resA.status === 'fulfilled' && resA.value) validResults.push(resA.value);
+        if (resB.status === 'fulfilled' && resB.value) validResults.push(resB.value);
+
+        if (validResults.length === 0) {
+          // 如果兩個都失敗，提取第一個失敗的錯誤訊息來拋出
+          const errReason = resA.status === 'rejected' ? resA.reason : (resB.status === 'rejected' ? resB.reason : '未知錯誤');
+          throw errReason instanceof Error ? errReason : new Error(String(errReason));
+        }
+
+        if (validResults.length === 1) {
+          console.warn(`[PDF 解析] 雙軌解析其中一軌失敗，退回單軌結果`);
+          markdownContent = validResults[0];
+        } else {
+          console.log(`[PDF 解析] 雙軌解析皆成功，開始進行 AI 交叉比對合併...`);
+          const mergePrompt = `以下是同一份行事曆的兩份不同 AI 解析結果（版本A 與 版本B）。
+請仔細交叉比對這兩份結果。
+1. 將所有出現過的事件合併在一起。
+2. 若版本A有但版本B漏掉，請補上；若版本B有但版本A漏掉，也請補上。
+3. 移除完全重複的事件。
+4. 最終輸出的格式必須嚴格遵照原有的 Markdown 格式（以 ## 單位： 開頭，事件以 ### 開頭）。
+絕對不可省略任何資訊。
+
+【版本A】
+${validResults[0]}
+
+【版本B】
+${validResults[1]}
+`;
+          const ai = getNextAIClient();
+          const mergeRes = await ai.models.generateContent({
+            model: modelName,
+            contents: mergePrompt,
+          });
+          markdownContent = mergeRes.text ?? validResults[0];
+          console.log(`[PDF 解析] 交叉比對合併完成！`);
+        }
+        
         break;
       } catch (err: unknown) {
         lastError = err instanceof Error ? err : new Error(String(err));
@@ -136,7 +199,7 @@ export async function POST(request: NextRequest) {
         const isRetryable = msg.includes('503') || msg.includes('429') || msg.includes('404');
 
         if (isRetryable) {
-          console.warn(`[PDF 解析] 模型 ${modelName} 暫時不可用，切換備用...`);
+          console.warn(`[PDF 解析] 模型 ${modelName} 暫時不可用或超載，切換備用模型...`);
           continue;
         }
         throw lastError;
