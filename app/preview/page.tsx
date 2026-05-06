@@ -297,15 +297,22 @@ export default function PreviewPage() {
             >
               👁 預覽
             </button>
-            {singleEditIdx !== -1 && (
-              <button
-                className={isEditing ? 'btn-primary' : 'btn-secondary'}
-                onClick={() => setIsEditing(true)}
-                style={{ padding: '0.5rem 1rem', fontSize: '0.9rem' }}
-              >
-                ✏️ 編輯
-              </button>
-            )}
+            <button
+              className={singleEditIdx !== -1 && isEditing ? 'btn-primary' : 'btn-secondary'}
+              onClick={() => {
+                if (singleEditIdx !== -1) setIsEditing(true);
+              }}
+              disabled={singleEditIdx === -1}
+              style={{
+                padding: '0.5rem 1rem',
+                fontSize: '0.9rem',
+                opacity: singleEditIdx === -1 ? 0.5 : 1,
+                cursor: singleEditIdx === -1 ? 'not-allowed' : 'pointer'
+              }}
+              title={singleEditIdx === -1 ? '請僅選取單一單位來進行編輯' : '切換至編輯模式'}
+            >
+              ✏️ 編輯
+            </button>
             <div style={{ flex: 1, minWidth: '200px', position: 'relative' }}>
               <span style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.9rem', color: 'var(--text-muted)' }}>🔍</span>
               <input
