@@ -67,19 +67,33 @@ export default function HomePage() {
     }
   };
 
+  const [progressText, setProgressText] = useState('');
+
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (loading) {
       setProgress(0);
+      setProgressText('正在平行發送初次解析請求...');
+      
       interval = setInterval(() => {
         setProgress((prev) => {
           if (prev >= 95) return 95;
-          const increment = Math.random() * 15;
-          return Math.min(prev + increment, 95);
+          // 對數遞減增長：越靠近 95 增加越慢
+          // 期望在前 15 秒達到 60%，在後 30 秒慢慢從 60% 爬到 95%
+          const remaining = 95 - prev;
+          const increment = (remaining * 0.05) + (Math.random() * 0.5);
+          const newProgress = Math.min(prev + increment, 95);
+          
+          if (newProgress > 60 && prev <= 60) {
+            setProgressText('正在進行 AI 交叉比對以提高準確率...');
+          }
+          
+          return newProgress;
         });
       }, 500);
     } else {
       setProgress(0);
+      setProgressText('');
     }
     return () => clearInterval(interval);
   }, [loading]);
@@ -229,7 +243,7 @@ export default function HomePage() {
           {loading && (
             <div style={{ marginTop: '1.5rem', textAlign: 'center' }}>
               <p style={{ color: 'var(--google-blue)', fontWeight: 600, marginBottom: '0.5rem' }}>
-                🤖 AI 正在智能解析行事曆內容，已完成 {Math.round(progress)}%...
+                🤖 {progress === 100 ? '解析完成，即將跳轉...' : progressText} ({Math.round(progress)}%)
               </p>
               <div style={{ width: '100%', height: '8px', backgroundColor: 'var(--bg-secondary)', borderRadius: '4px', overflow: 'hidden', position: 'relative' }}>
                 <div style={{

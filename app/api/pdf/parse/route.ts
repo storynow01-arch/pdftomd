@@ -131,23 +131,67 @@ export async function POST(request: NextRequest) {
 
     // Step 2: 將提取的文字傳給 Gemini API 分析
     const prompt = buildPrompt(pdfText, file.name);
+    // 獨立出單次解析函式
+    const runParsingPass = async (modelName: string): Promise<string> => {
+      const ai = getNextAIClient();
+      const response = await ai.models.generateContent({
+        model: modelName,
+        contents: prompt,
+      });
+      return response.text ?? '';
+    };
+
     let markdownContent = '';
     let lastError: Error | null = null;
 
     for (const modelName of MODELS) {
       try {
-        console.log(`[PDF 解析] 嘗試模型：${modelName}`);
+        console.log(`[PDF 解析] 嘗試模型：${modelName} (雙軌並行)`);
         
-        // 每次嘗試都取得下一個輪詢的 AI 客戶端
-        const ai = getNextAIClient();
+        // 雙軌並行發送
+        const [resA, resB] = await Promise.allSettled([
+          runParsingPass(modelName),
+          runParsingPass(modelName)
+        ]);
 
-        const response = await ai.models.generateContent({
-          model: modelName,
-          contents: prompt,
-        });
+        const validResults: string[] = [];
+        if (resA.status === 'fulfilled' && resA.value) validResults.push(resA.value);
+        if (resB.status === 'fulfilled' && resB.value) validResults.push(resB.value);
 
-        markdownContent = response.text ?? '';
-        console.log(`[PDF 解析] 成功，使用：${modelName}`);
+        if (validResults.length === 0) {
+          // 如果兩個都失敗，提取第一個失敗的錯誤訊息來拋出
+          const errReason = resA.status === 'rejected' ? resA.reason : (resB.status === 'rejected' ? resB.reason : '未知錯誤');
+          throw errReason instanceof Error ? errReason : new Error(String(errReason));
+        }
+
+        if (validResults.length === 1) {
+          console.warn(`[PDF 解析] 雙軌解析其中一軌失敗，退回單軌結果`);
+          markdownContent = validResults[0];
+        } else {
+          console.log(`[PDF 解析] 雙軌解析皆成功，開始進行 AI 交叉比對合併...`);
+          const mergePrompt = `以下是同一份行事曆的兩份不同 AI 解析結果（版本A 與 版本B）。
+請仔細交叉比對這兩份結果。
+1. 將所有出現過的事件合併在一起。
+2. 若版本A有但版本B漏掉，請補上；若版本B有但版本A漏掉，也請補上。
+3. 移除完全重複的事件。
+4. 最終輸出的格式必須嚴格遵照原有的 Markdown 格式（以 ## 單位： 開頭，事件以 ### 開頭）。
+絕對不可省略任何資訊。
+
+【版本A】
+${validResults[0]}
+
+【版本B】
+${validResults[1]}
+`;
+          const ai = getNextAIClient();
+          const mergeRes = await ai.models.generateContent({
+            model: modelName,
+            contents: mergePrompt,
+          });
+          markdownContent = mergeRes.text ?? validResults[0];
+          console.log(`[PDF 解析] 交叉比對合併完成！`);
+        }
+        
         break;
       } catch (err: unknown) {
         lastError = err instanceof Error ? err : new Error(String(err));
@@ -155,7 +199,7 @@ export async function POST(request: NextRequest) {
         const isRetryable = msg.includes('503') || msg.includes('429') || msg.includes('404');
 
         if (isRetryable) {
-          console.warn(`[PDF 解析] 模型 ${modelName} 暫時不可用，切換備用...`);
+          console.warn(`[PDF 解析] 模型 ${modelName} 暫時不可用或超載，切換備用模型...`);
           continue;
         }
         throw lastError;
