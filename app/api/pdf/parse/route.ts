@@ -10,15 +10,31 @@ const pdfParseModule = require('pdf-parse');
 const pdfParse: (buffer: Buffer) => Promise<{ text: string; numpages: number }> =
   typeof pdfParseModule === 'function' ? pdfParseModule : (pdfParseModule.default ?? pdfParseModule);
 
-// 使用新版官方 SDK
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+// 解析 API Keys（支援多組，以逗號分隔）
+const apiKeys = (process.env.GEMINI_API_KEY || '')
+  .split(',')
+  .map(k => k.trim())
+  .filter(k => k);
 
-// 模型優先順序：2.5 繁忙時，退回到有高配額的 Gemma 3 模型
-const MODELS = [
+let currentKeyIndex = 0;
+
+function getNextAIClient() {
+  if (apiKeys.length === 0) {
+    throw new Error('Server Configuration Error: GEMINI_API_KEY is missing.');
+  }
+  const key = apiKeys[currentKeyIndex];
+  currentKeyIndex = (currentKeyIndex + 1) % apiKeys.length;
+  console.log(`[API Key 輪詢] 目前使用第 ${currentKeyIndex === 0 ? apiKeys.length : currentKeyIndex} 組 Key`);
+  return new GoogleGenAI({ apiKey: key });
+}
+
+// 模型優先順序：優先讀取環境變數，預設使用 gemini-3-flash-preview
+const defaultModel = process.env.GEMINI_MODEL || 'gemini-3-flash-preview';
+const MODELS = Array.from(new Set([
+  defaultModel,
   'gemini-2.5-flash',
-  'gemma-3-27b-it',
   'gemini-flash-latest'
-];
+]));
 
 const buildPrompt = (pdfText: string, filename: string) => `你是一個行事曆解析助手。請分析以下從 PDF 提取的文字內容，找出所有行事曆相關資訊（活動、行程、時間、日期、地點等）。
 
@@ -122,6 +138,9 @@ export async function POST(request: NextRequest) {
       try {
         console.log(`[PDF 解析] 嘗試模型：${modelName}`);
         
+        // 每次嘗試都取得下一個輪詢的 AI 客戶端
+        const ai = getNextAIClient();
+
         const response = await ai.models.generateContent({
           model: modelName,
           contents: prompt,
