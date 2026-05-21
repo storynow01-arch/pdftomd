@@ -46,6 +46,91 @@ function StepIndicator({ current }: { current: number }) {
   );
 }
 
+/** 轉義 ICS 特殊字元以防規格破裂 */
+function escapeIcsText(text: string): string {
+  if (!text) return '';
+  return text
+    .replace(/\\/g, '\\\\')
+    .replace(/;/g, '\\;')
+    .replace(/,/g, '\\,')
+    .replace(/\n/g, '\\n')
+    .replace(/\r/g, '');
+}
+
+/** 格式化日期為 ICS 標準規格 */
+function formatDateToIcs(dateStr: string, isAllDay: boolean, isEnd = false): string {
+  const date = new Date(dateStr);
+  
+  if (isNaN(date.getTime())) {
+    const clean = dateStr.replace(/[-:]/g, '');
+    if (isAllDay) return clean.split('T')[0];
+    return clean;
+  }
+
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  
+  if (isAllDay) {
+    if (isEnd) {
+      // RFC 5545: 全天事件的 DTEND 必須是結束日期當天的下一天
+      const endDate = new Date(date.getTime() + 24 * 60 * 60 * 1000);
+      const ey = endDate.getFullYear();
+      const em = String(endDate.getMonth() + 1).padStart(2, '0');
+      const ed = String(endDate.getDate()).padStart(2, '0');
+      return `${ey}${em}${ed}`;
+    }
+    return `${yyyy}${mm}${dd}`;
+  } else {
+    const hh = String(date.getHours()).padStart(2, '0');
+    const min = String(date.getMinutes()).padStart(2, '0');
+    const ss = String(date.getSeconds()).padStart(2, '0');
+    return `${yyyy}${mm}${dd}T${hh}${min}${ss}`;
+  }
+}
+
+/** 生成符合 RFC 5545 標準的 .ics 格式檔案內容 */
+function generateIcsContent(events: CalendarEvent[]): string {
+  const ics = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Antigravity//Calendar Parser//EN',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH'
+  ];
+
+  // 使用標準 UTC 當前時間做為 DTSTAMP
+  const nowStr = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+
+  events.forEach((event, idx) => {
+    ics.push('BEGIN:VEVENT');
+    ics.push(`UID:event-${idx}-${nowStr}@antigravity.parser`);
+    ics.push(`DTSTAMP:${nowStr}`);
+    
+    if (event.isAllDay) {
+      ics.push(`DTSTART;VALUE=DATE:${formatDateToIcs(event.startTime, true, false)}`);
+      ics.push(`DTEND;VALUE=DATE:${formatDateToIcs(event.endTime, true, true)}`);
+    } else {
+      ics.push(`DTSTART:${formatDateToIcs(event.startTime, false, false)}`);
+      ics.push(`DTEND:${formatDateToIcs(event.endTime, false, true)}`);
+    }
+    
+    ics.push(`SUMMARY:${escapeIcsText(event.title)}`);
+    
+    if (event.description) {
+      ics.push(`DESCRIPTION:${escapeIcsText(event.description)}`);
+    }
+    if (event.location) {
+      ics.push(`LOCATION:${escapeIcsText(event.location)}`);
+    }
+    
+    ics.push('END:VEVENT');
+  });
+
+  ics.push('END:VCALENDAR');
+  return ics.join('\r\n');
+}
+
 /** 從 Markdown 文字中解析出事件列表（含單位資訊） */
 function parseEventsFromMarkdown(md: string): CalendarEvent[] {
   const events: CalendarEvent[] = [];
@@ -122,6 +207,7 @@ export default function CalendarPage() {
   const router = useRouter();
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [showIcsGuide, setShowIcsGuide] = useState(false);
   const [notionUrl, setNotionUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [synced, setSynced] = useState(false);
@@ -218,6 +304,34 @@ export default function CalendarPage() {
       setError(err instanceof Error ? err.message : '同步失敗');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDownloadIcs = () => {
+    const toDownload = events.filter((e) => selected.has(e.id));
+    if (toDownload.length === 0) {
+      setError('請至少選擇一個事件進行下載');
+      return;
+    }
+    setError('');
+    try {
+      const icsContent = generateIcsContent(toDownload);
+      const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      
+      const link = document.createElement('a');
+      const dateLabel = new Date().toISOString().split('T')[0].replace(/-/g, '');
+      link.href = url;
+      link.download = `calendar_events_${dateLabel}.ics`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      // 顯示下載成功暨日曆匯入指南
+      setShowIcsGuide(true);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : '下載行事曆檔案失敗');
     }
   };
 
@@ -443,7 +557,7 @@ export default function CalendarPage() {
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'flex-end',
-        gap: '0.6rem',
+        gap: '0.8rem',
         zIndex: 1000,
       }}>
         {/* 錯誤訊息 */}
@@ -456,30 +570,193 @@ export default function CalendarPage() {
             fontSize: '0.9rem',
             color: 'var(--google-red)',
             backdropFilter: 'blur(8px)',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
           }}>
             ⚠️ {error}
           </div>
         )}
 
-        {/* 次要：返回預覽 */}
+        {/* 返回預覽（次要按鈕） */}
         <button
           className="btn-secondary"
           onClick={() => router.push('/preview')}
-          style={{ boxShadow: '0 2px 10px rgba(0,0,0,0.12)', backdropFilter: 'blur(8px)', padding: '0.55rem 1.1rem', fontSize: '0.9rem' }}
+          style={{ 
+            boxShadow: '0 2px 10px rgba(0,0,0,0.12)', 
+            backdropFilter: 'blur(8px)', 
+            padding: '0.55rem 1.1rem', 
+            fontSize: '0.9rem',
+            transition: 'transform 0.2s, background-color 0.2s'
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; }}
         >
           ← 返回預覽
         </button>
 
-        {/* 主要：加入行事曆 */}
-        <button
-          className="btn-primary"
-          style={{ backgroundColor: 'var(--google-green)', boxShadow: '0 4px 16px rgba(52,168,83,0.45)', padding: '0.75rem 1.5rem', fontSize: '1rem' }}
-          onClick={handleSync}
-          disabled={loading || selected.size === 0}
-        >
-          {loading ? '同步中...' : `📅 加入 ${selected.size} 個事件`}
-        </button>
+        {/* 主要操作按鈕區（並列） */}
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          {/* 免設定下載 .ics */}
+          <button
+            className="btn-primary"
+            style={{ 
+              backgroundColor: 'var(--google-blue)', 
+              boxShadow: '0 4px 16px rgba(66,133,244,0.45)', 
+              padding: '0.75rem 1.5rem', 
+              fontSize: '1rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              transition: 'transform 0.2s, filter 0.2s'
+            }}
+            onClick={handleDownloadIcs}
+            disabled={selected.size === 0}
+            onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.filter = 'brightness(1.08)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.filter = 'none'; }}
+          >
+            <span>📥</span> 下載 .ics 檔案 (免設定)
+          </button>
+
+          {/* 同步 Google 行事曆 (使用個人 GAS) */}
+          <button
+            className="btn-primary"
+            style={{ 
+              backgroundColor: 'var(--google-green)', 
+              boxShadow: '0 4px 16px rgba(52,168,83,0.45)', 
+              padding: '0.75rem 1.5rem', 
+              fontSize: '1rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              transition: 'transform 0.2s, filter 0.2s'
+            }}
+            onClick={handleSync}
+            disabled={loading || selected.size === 0}
+            onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.filter = 'brightness(1.08)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.filter = 'none'; }}
+          >
+            {loading ? '同步中...' : `📅 加入 Google 日曆 (GAS)`}
+          </button>
+        </div>
       </div>
+
+      {/* ── 下載成功暨日曆匯入指南 Modal ───────────────────── */}
+      {showIcsGuide && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          backgroundColor: 'rgba(0, 0, 0, 0.45)',
+          backdropFilter: 'blur(10px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10000,
+          animation: 'fadeIn 0.25s ease-out'
+        }}>
+          <div className="card" style={{
+            width: '90%',
+            maxWidth: '560px',
+            padding: '2.2rem',
+            borderRadius: '16px',
+            boxShadow: '0 24px 48px rgba(0,0,0,0.18)',
+            backgroundColor: 'var(--bg-primary)',
+            border: '1px solid var(--border-subtle)',
+            position: 'relative',
+            animation: 'scaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)'
+          }}>
+            {/* 關閉按鈕 */}
+            <button 
+              onClick={() => setShowIcsGuide(false)}
+              style={{
+                position: 'absolute',
+                top: '1.2rem',
+                right: '1.2rem',
+                background: 'none',
+                border: 'none',
+                fontSize: '1.3rem',
+                color: 'var(--text-muted)',
+                cursor: 'pointer',
+                transition: 'color 0.2s, transform 0.2s'
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-primary)'; e.currentTarget.style.transform = 'scale(1.1)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.transform = 'scale(1)'; }}
+            >
+              ✕
+            </button>
+
+            <div style={{ textAlign: 'center', marginBottom: '1.8rem' }}>
+              <div style={{ fontSize: '3.8rem', marginBottom: '0.5rem', display: 'inline-block' }}>🎉</div>
+              <h2 style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--google-green)', margin: 0, letterSpacing: '0.5px' }}>
+                行事曆檔案下載成功！
+              </h2>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', marginTop: '0.6rem', lineHeight: 1.5 }}>
+                成功下載了 <strong>{events.filter(e => selected.has(e.id)).length}</strong> 個日程事件，請參考下方指南將其快速匯入：
+              </p>
+            </div>
+
+            {/* 匯入教學分流 */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+              {/* 🌐 Google Calendar (網頁版) */}
+              <div style={{
+                padding: '1.2rem',
+                borderRadius: '12px',
+                backgroundColor: 'rgba(66, 133, 244, 0.04)',
+                border: '1px solid rgba(66, 133, 244, 0.12)'
+              }}>
+                <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--google-blue)', margin: '0 0 0.6rem 0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span>🌐</span> 匯入至 Google 日曆 (電腦網頁版)
+                </h3>
+                <ol style={{ margin: 0, paddingLeft: '1.25rem', fontSize: '0.88rem', color: 'var(--text-secondary)', lineHeight: 1.65 }}>
+                  <li>開啟 <a href="https://calendar.google.com" target="_blank" rel="noreferrer" style={{ color: 'var(--google-blue)', textDecoration: 'underline', fontWeight: 600 }}>Google 日曆網頁</a></li>
+                  <li>點選右上角齒輪圖示 ⚙️ 進入 <strong>「設定」</strong></li>
+                  <li>在左側導覽列中，點選 <strong>「匯入與匯出」</strong></li>
+                  <li>從電腦上選擇剛下載的 <code>.ics</code> 檔案並按下 <strong>「匯入」</strong> 即可！</li>
+                </ol>
+              </div>
+
+              {/* 💻 Apple Calendar / 手機內建 */}
+              <div style={{
+                padding: '1.2rem',
+                borderRadius: '12px',
+                backgroundColor: 'rgba(52, 168, 83, 0.04)',
+                border: '1px solid rgba(52, 168, 83, 0.12)'
+              }}>
+                <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--google-green)', margin: '0 0 0.6rem 0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span>💻</span> 匯入至 Apple 日曆 / 內建日曆 (手機或電腦)
+                </h3>
+                <ol style={{ margin: 0, paddingLeft: '1.25rem', fontSize: '0.88rem', color: 'var(--text-secondary)', lineHeight: 1.65 }}>
+                  <li><strong>雙擊</strong> (Double Click) 剛下載的 <code>.ics</code> 檔案</li>
+                  <li>系統將會自動喚起您設備上的<strong>內建日曆應用程式</strong></li>
+                  <li>在彈出的對話框中選取您要同步的日曆，點擊 <strong>「加入/確認」</strong> 即可！</li>
+                </ol>
+              </div>
+            </div>
+
+            {/* 底部按鈕 */}
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '0.8rem', marginTop: '2.2rem' }}>
+              <button 
+                className="btn-primary" 
+                onClick={() => {
+                  setShowIcsGuide(false);
+                  router.push('/');
+                }}
+                style={{ padding: '0.65rem 1.6rem', fontSize: '0.95rem', boxShadow: '0 4px 12px rgba(66,133,244,0.2)' }}
+              >
+                ＋ 解析新的 PDF
+              </button>
+              <button 
+                className="btn-secondary" 
+                onClick={() => setShowIcsGuide(false)}
+                style={{ padding: '0.65rem 1.6rem', fontSize: '0.95rem' }}
+              >
+                留在本頁檢查
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
