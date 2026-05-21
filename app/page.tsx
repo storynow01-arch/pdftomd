@@ -119,6 +119,12 @@ export default function HomePage() {
         sessionStorage.setItem('parsedMarkdown', data.markdown);
         sessionStorage.setItem('sourceFilename', data.filename);
         
+        if (data.accuracy) {
+          sessionStorage.setItem('parsedAccuracy', JSON.stringify(data.accuracy));
+        } else {
+          sessionStorage.removeItem('parsedAccuracy');
+        }
+        
         // 如果使用了備用模型，把資訊存入，讓前端顯示警告
         if (data.isFallback) {
           sessionStorage.setItem('isFallbackModel', 'true');
