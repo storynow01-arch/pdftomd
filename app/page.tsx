@@ -254,34 +254,207 @@ export default function HomePage() {
           </li>
           <li style={{ marginBottom: '1rem', display: 'flex', gap: '0.5rem' }}>
             <span style={{ color: 'var(--google-yellow)' }}>⏳</span>
-            <span>解析過程約需 10~30 秒，進度條完成後將自動跳轉。</span>
-          </li>
-          <li style={{ marginBottom: '1rem', display: 'flex', gap: '0.5rem' }}>
-            <span style={{ color: 'var(--google-green)' }}>🔄</span>
-            <span>流程：預覽校對 ➔ 單位複選 ➔ 同步 Notion ➔ 匯入行事曆。</span>
-          </li>
-          <li style={{ marginBottom: '1rem', display: 'flex', gap: '0.5rem' }}>
-            <span style={{ color: 'var(--google-blue)' }}>🔒</span>
-            <span>自訂 API 金鑰 100% 儲存於您本地瀏覽器 (localStorage)，安全且不經由本站伺服器轉存。</span>
+            <span>解析通常在 10 至 30 秒內完成，取決於 PDF 檔案大小。</span>
           </li>
         </ul>
-
-        {/* 將執行按鈕移到提示區下方 */}
-        <div style={{ marginTop: '2rem' }}>
-          <button
-            className="btn-primary"
-            onClick={handleParse}
-            disabled={!file || loading}
-            style={{ width: '100%', fontSize: '1.05rem', padding: '0.75rem 1rem', boxShadow: '0 4px 16px rgba(66,133,244,0.3)' }}
-          >
-            {loading ? '🤖 解析中...' : '開始解析 →'}
-          </button>
-        </div>
       </aside>
 
-      {/* 右側核心區：Dropzone */}
-      <main className="cornell-notes">
-        <div className="card" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      {/* 右側核心區：左右並排響應式 Grid 佈局 */}
+      <main className="cornell-notes" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: '1.5rem', alignItems: 'stretch' }}>
+        
+        {/* 左側卡片：自訂金鑰設定 */}
+        <div className="card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', backgroundColor: 'var(--bg-primary)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.75rem', marginBottom: '0.25rem' }}>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
+              <span>🔧</span> 個人 API 設定 (免部署自訂金鑰)
+            </h3>
+            <span style={{ fontSize: '0.75rem', color: 'var(--google-green)', fontWeight: 700, padding: '0.15rem 0.5rem', borderRadius: '12px', backgroundColor: 'rgba(52,168,83,0.1)', border: '1px solid rgba(52,168,83,0.15)' }}>
+              🔒 本地安全儲存
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem', flex: 1 }}>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.5, margin: 0, backgroundColor: 'var(--bg-secondary)', padding: '0.75rem', borderRadius: '6px', borderLeft: '3px solid var(--google-blue)' }}>
+              💡 <strong>說明與隱私保障：</strong> 為了讓本系統對所有人開放自由使用，且不需要任何個人 Vercel 部署程序，您可以自訂個人的 API 金鑰。所有金鑰<strong>皆僅儲存於您本地瀏覽器 (localStorage)</strong>，伺服器絕不上傳收集，請放心使用。
+            </p>
+
+            {/* Gemini API Key */}
+            <div>
+              <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.35rem', color: 'var(--text-primary)' }}>
+                <span>Gemini API Key (自訂解析金鑰)</span>
+                <a 
+                  href="https://aistudio.google.com/" 
+                  target="_blank" 
+                  rel="noreferrer" 
+                  style={{ color: 'var(--google-blue)', textDecoration: 'underline', fontWeight: 'normal' }}
+                >
+                  免費申請 Gemini 憑證 ↗
+                </a>
+              </label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showGemini ? 'text' : 'password'}
+                  value={geminiApiKey}
+                  onChange={(e) => handleKeyChange('gemini', e.target.value)}
+                  placeholder="請輸入 Gemini API 金鑰 (AIzaSy...，留空則採用伺服器預設)"
+                  style={{
+                    width: '100%',
+                    padding: '0.45rem 2.5rem 0.45rem 0.75rem',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: '6px',
+                    fontSize: '0.85rem',
+                    outline: 'none',
+                    backgroundColor: 'var(--bg-secondary)',
+                    color: 'var(--text-primary)',
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowGemini(!showGemini)}
+                  style={{
+                    position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)',
+                    background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', opacity: 0.6
+                  }}
+                >
+                  {showGemini ? '👁️' : '🙈'}
+                </button>
+              </div>
+            </div>
+
+            {/* Notion Token */}
+            <div>
+              <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.35rem', color: 'var(--text-primary)' }}>
+                <span>Notion Integration Token (寫入 Notion 必填)</span>
+                <a 
+                  href="https://www.notion.so/my-integrations" 
+                  target="_blank" 
+                  rel="noreferrer" 
+                  style={{ color: 'var(--google-blue)', textDecoration: 'underline', fontWeight: 'normal' }}
+                >
+                  建立 Notion 整合 ↗
+                </a>
+              </label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showNotionToken ? 'text' : 'password'}
+                  value={notionToken}
+                  onChange={(e) => handleKeyChange('notion_token', e.target.value)}
+                  placeholder="請輸入 Notion 整合 Token (secret_...)"
+                  style={{
+                    width: '100%',
+                    padding: '0.45rem 2.5rem 0.45rem 0.75rem',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: '6px',
+                    fontSize: '0.85rem',
+                    outline: 'none',
+                    backgroundColor: 'var(--bg-secondary)',
+                    color: 'var(--text-primary)',
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNotionToken(!showNotionToken)}
+                  style={{
+                    position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)',
+                    background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', opacity: 0.6
+                  }}
+                >
+                  {showNotionToken ? '👁️' : '🙈'}
+                </button>
+              </div>
+            </div>
+
+            {/* Notion Page ID */}
+            <div>
+              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.35rem', color: 'var(--text-primary)' }}>
+                Notion Page ID (寫入 Notion 必填，須先將此頁與 Integration 共享)
+              </label>
+              <input
+                type="text"
+                value={notionPageId}
+                onChange={(e) => handleKeyChange('notion_page_id', e.target.value)}
+                placeholder="請輸入 Notion 父頁面 ID (32位十六進位字元)"
+                style={{
+                  width: '100%',
+                  padding: '0.45rem 0.75rem',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: '6px',
+                  fontSize: '0.85rem',
+                  outline: 'none',
+                  backgroundColor: 'var(--bg-secondary)',
+                  color: 'var(--text-primary)',
+                }}
+              />
+            </div>
+
+            {/* GAS URL */}
+            <div>
+              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.35rem', color: 'var(--text-primary)' }}>
+                Google Calendar GAS URL (選填，留空可直接於第四步下載 .ics 檔案)
+              </label>
+              <input
+                type="text"
+                value={gasUrl}
+                onChange={(e) => handleKeyChange('gas_url', e.target.value)}
+                placeholder="請輸入 GAS URL (https://script.google.com/...)"
+                style={{
+                  width: '100%',
+                  padding: '0.45rem 0.75rem',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: '6px',
+                  fontSize: '0.85rem',
+                  outline: 'none',
+                  backgroundColor: 'var(--bg-secondary)',
+                  color: 'var(--text-primary)',
+                }}
+              />
+            </div>
+
+            {/* GAS Secret Key */}
+            <div>
+              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.35rem', color: 'var(--text-primary)' }}>
+                GAS Secret Key (選填，GAS 安全驗證金鑰)
+              </label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showGasSecret ? 'text' : 'password'}
+                  value={gasSecretKey}
+                  onChange={(e) => handleKeyChange('gas_secret_key', e.target.value)}
+                  placeholder="請輸入 GAS Secret Key"
+                  style={{
+                    width: '100%',
+                    padding: '0.45rem 2.5rem 0.45rem 0.75rem',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: '6px',
+                    fontSize: '0.85rem',
+                    outline: 'none',
+                    backgroundColor: 'var(--bg-secondary)',
+                    color: 'var(--text-primary)',
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowGasSecret(!showGasSecret)}
+                  style={{
+                    position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)',
+                    background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', opacity: 0.6
+                  }}
+                >
+                  {showGasSecret ? '👁️' : '🙈'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 右側卡片：PDF 拖曳上傳與進度 */}
+        <div className="card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--bg-primary)', justifyContent: 'space-between', minHeight: '480px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1.2rem', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.75rem' }}>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
+              <span>📥</span> 上傳行事曆 PDF
+            </h3>
+          </div>
+
           <div
             style={{
               flex: 1,
@@ -294,6 +467,7 @@ export default function HomePage() {
               justifyContent: 'center',
               cursor: 'pointer',
               transition: 'all 0.2s ease',
+              minHeight: '280px',
             }}
             onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
             onDragLeave={() => setIsDragging(false)}
@@ -308,13 +482,13 @@ export default function HomePage() {
               style={{ display: 'none' }}
             />
             {file ? (
-              <div style={{ textAlign: 'center' }}>
+              <div style={{ textAlign: 'center', padding: '1rem' }}>
                 <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📄</div>
-                <p style={{ color: 'var(--google-blue)', fontWeight: 600, fontSize: '1.1rem' }}>{file.name}</p>
+                <p style={{ color: 'var(--google-blue)', fontWeight: 600, fontSize: '1.1rem', wordBreak: 'break-all', padding: '0 1rem' }}>{file.name}</p>
                 <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '0.5rem' }}>
                   {(file.size / 1024).toFixed(1)} KB
                 </p>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '1rem' }}>點擊重新選擇</p>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '1rem' }}>點擊或重新拖曳以更換檔案</p>
               </div>
             ) : (
               <div style={{ textAlign: 'center', padding: '2rem' }}>
@@ -322,12 +496,12 @@ export default function HomePage() {
                 <p style={{ color: 'var(--text-primary)', fontSize: '1.2rem', fontWeight: 500, marginBottom: '0.5rem' }}>
                   拖曳 PDF 到這裡，或點擊選擇檔案
                 </p>
-                <p style={{ color: 'var(--text-secondary)' }}>最大支援 10MB 的 PDF 文件</p>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>最大支援 10MB 的 PDF 文件</p>
               </div>
             )}
           </div>
           {error && (
-            <div style={{ marginTop: '1rem', padding: '0.75rem', backgroundColor: 'rgba(234, 67, 53, 0.1)', color: 'var(--google-red)', borderRadius: '4px', border: '1px solid var(--google-red)' }}>
+            <div style={{ marginTop: '1rem', padding: '0.75rem', backgroundColor: 'rgba(234, 67, 53, 0.1)', color: 'var(--google-red)', borderRadius: '6px', border: '1px solid var(--google-red)', fontSize: '0.9rem' }}>
               ⚠️ {error}
             </div>
           )}
@@ -335,7 +509,7 @@ export default function HomePage() {
           {/* 百分比進度條 */}
           {loading && (
             <div style={{ marginTop: '1.5rem', textAlign: 'center' }}>
-              <p style={{ color: 'var(--google-blue)', fontWeight: 600, marginBottom: '0.5rem' }}>
+              <p style={{ color: 'var(--google-blue)', fontWeight: 600, marginBottom: '0.5rem', fontSize: '0.9rem' }}>
                 🤖 {progress === 100 ? '解析完成，即將跳轉...' : progressText} ({Math.round(progress)}%)
               </p>
               <div style={{ width: '100%', height: '8px', backgroundColor: 'var(--bg-secondary)', borderRadius: '4px', overflow: 'hidden', position: 'relative' }}>
@@ -350,199 +524,7 @@ export default function HomePage() {
             </div>
           )}
         </div>
-
-        {/* 自訂金鑰設定折疊面板 */}
-        <div className="card" style={{ marginTop: '1.5rem', padding: '1.2rem', transition: 'all 0.3s ease' }}>
-          <div 
-            onClick={() => setIsAccordionOpen(!isAccordionOpen)}
-            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', userSelect: 'none' }}
-          >
-            <h3 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
-              <span>🔧</span> 個人 API 設定 (自訂金鑰免部署)
-            </h3>
-            <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)', transform: isAccordionOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }}>
-              ▼
-            </span>
-          </div>
-
-          {isAccordionOpen && (
-            <div style={{ marginTop: '1.2rem', display: 'flex', flexDirection: 'column', gap: '1rem', animation: 'fadeIn 0.2s ease-out' }}>
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.5, margin: '0 0 0.5rem 0', backgroundColor: 'var(--bg-secondary)', padding: '0.75rem', borderRadius: '6px', borderLeft: '3px solid var(--google-blue)' }}>
-                💡 <strong>為什麼要填寫？</strong> 為了讓本系統對所有人開放自由使用，且不需要任何個人 Vercel 部署程序，您可以自訂個人的 API 金鑰。所有金鑰<strong>皆僅儲存於您本地瀏覽器</strong>，伺服器絕不上傳收集，請放心使用。
-              </p>
-
-              {/* Gemini API Key */}
-              <div>
-                <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.4rem', color: 'var(--text-primary)' }}>
-                  <span>Gemini API Key (自訂解析金鑰)</span>
-                  <a 
-                    href="https://aistudio.google.com/" 
-                    target="_blank" 
-                    rel="noreferrer" 
-                    style={{ color: 'var(--google-blue)', textDecoration: 'underline', fontWeight: 'normal' }}
-                  >
-                    免費申請 Gemini 憑證 ↗
-                  </a>
-                </label>
-                <div style={{ position: 'relative' }}>
-                  <input
-                    type={showGemini ? 'text' : 'password'}
-                    value={geminiApiKey}
-                    onChange={(e) => handleKeyChange('gemini', e.target.value)}
-                    placeholder="請輸入 Gemini API 金鑰 (AIzaSy...，留空則採用伺服器預設)"
-                    style={{
-                      width: '100%',
-                      padding: '0.5rem 2.5rem 0.5rem 0.75rem',
-                      border: '1px solid var(--border-subtle)',
-                      borderRadius: '6px',
-                      fontSize: '0.9rem',
-                      outline: 'none',
-                      backgroundColor: 'var(--bg-primary)',
-                      color: 'var(--text-primary)',
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowGemini(!showGemini)}
-                    style={{
-                      position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)',
-                      background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', opacity: 0.6
-                    }}
-                  >
-                    {showGemini ? '👁️' : '🙈'}
-                  </button>
-                </div>
-              </div>
-
-              {/* Notion Token */}
-              <div>
-                <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.4rem', color: 'var(--text-primary)' }}>
-                  <span>Notion Integration Token (寫入 Notion 時必填)</span>
-                  <a 
-                    href="https://www.notion.so/my-integrations" 
-                    target="_blank" 
-                    rel="noreferrer" 
-                    style={{ color: 'var(--google-blue)', textDecoration: 'underline', fontWeight: 'normal' }}
-                  >
-                    建立 Notion 整合 ↗
-                  </a>
-                </label>
-                <div style={{ position: 'relative' }}>
-                  <input
-                    type={showNotionToken ? 'text' : 'password'}
-                    value={notionToken}
-                    onChange={(e) => handleKeyChange('notion_token', e.target.value)}
-                    placeholder="請輸入 Notion 整合 Token (secret_...)"
-                    style={{
-                      width: '100%',
-                      padding: '0.5rem 2.5rem 0.5rem 0.75rem',
-                      border: '1px solid var(--border-subtle)',
-                      borderRadius: '6px',
-                      fontSize: '0.9rem',
-                      outline: 'none',
-                      backgroundColor: 'var(--bg-primary)',
-                      color: 'var(--text-primary)',
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowNotionToken(!showNotionToken)}
-                    style={{
-                      position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)',
-                      background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', opacity: 0.6
-                    }}
-                  >
-                    {showNotionToken ? '👁️' : '🙈'}
-                  </button>
-                </div>
-              </div>
-
-              {/* Notion Page ID */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.4rem', color: 'var(--text-primary)' }}>
-                  Notion Page ID (寫入 Notion 時必填，須先將此頁面與 Notion 整合共享連結)
-                </label>
-                <input
-                  type="text"
-                  value={notionPageId}
-                  onChange={(e) => handleKeyChange('notion_page_id', e.target.value)}
-                  placeholder="請輸入 Notion 父頁面 ID (32位十六進位字元)"
-                  style={{
-                    width: '100%',
-                    padding: '0.5rem 0.75rem',
-                    border: '1px solid var(--border-subtle)',
-                    borderRadius: '6px',
-                    fontSize: '0.9rem',
-                    outline: 'none',
-                    backgroundColor: 'var(--bg-primary)',
-                    color: 'var(--text-primary)',
-                  }}
-                />
-              </div>
-
-              {/* GAS URL */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.4rem', color: 'var(--text-primary)' }}>
-                  Google Calendar GAS Web App URL (選填，若留空可直接在第四步下載 .ics 檔案一鍵匯入)
-                </label>
-                <input
-                  type="text"
-                  value={gasUrl}
-                  onChange={(e) => handleKeyChange('gas_url', e.target.value)}
-                  placeholder="請輸入 GAS 網頁應用程式 URL (https://script.google.com/...)"
-                  style={{
-                    width: '100%',
-                    padding: '0.5rem 0.75rem',
-                    border: '1px solid var(--border-subtle)',
-                    borderRadius: '6px',
-                    fontSize: '0.9rem',
-                    outline: 'none',
-                    backgroundColor: 'var(--bg-primary)',
-                    color: 'var(--text-primary)',
-                  }}
-                />
-              </div>
-
-              {/* GAS Secret Key */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.4rem', color: 'var(--text-primary)' }}>
-                  GAS Secret Key (選填，配合 GAS 驗證使用的安全金鑰)
-                </label>
-                <div style={{ position: 'relative' }}>
-                  <input
-                    type={showGasSecret ? 'text' : 'password'}
-                    value={gasSecretKey}
-                    onChange={(e) => handleKeyChange('gas_secret_key', e.target.value)}
-                    placeholder="請輸入 GAS Secret Key"
-                    style={{
-                      width: '100%',
-                      padding: '0.5rem 2.5rem 0.5rem 0.75rem',
-                      border: '1px solid var(--border-subtle)',
-                      borderRadius: '6px',
-                      fontSize: '0.9rem',
-                      outline: 'none',
-                      backgroundColor: 'var(--bg-primary)',
-                      color: 'var(--text-primary)',
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowGasSecret(!showGasSecret)}
-                    style={{
-                      position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)',
-                      background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', opacity: 0.6
-                    }}
-                  >
-                    {showGasSecret ? '👁️' : '🙈'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
       </main>
-
-      {/* footer 已經不需要了，移除以保持版面簡潔 */}
     </div>
   );
 }
