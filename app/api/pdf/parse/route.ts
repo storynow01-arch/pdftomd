@@ -270,6 +270,7 @@ export async function POST(request: NextRequest) {
           prompt
         ],
         config: {
+          temperature: 0.0,
           responseMimeType: 'application/json',
           responseSchema: {
             type: 'OBJECT',
