@@ -52,6 +52,8 @@ export default function HomePage() {
   const [gasUrl, setGasUrl] = useState('');
   const [gasSecretKey, setGasSecretKey] = useState('');
   const [isAccordionOpen, setIsAccordionOpen] = useState(false);
+  const [showGasModal, setShowGasModal] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const [showGemini, setShowGemini] = useState(false);
   const [showNotionToken, setShowNotionToken] = useState(false);
@@ -250,7 +252,7 @@ export default function HomePage() {
           </li>
           <li style={{ marginBottom: '1rem', display: 'flex', gap: '0.5rem' }}>
             <span style={{ color: 'var(--google-blue)' }}>🧠</span>
-            <span>系統使用高效能 <strong>Gemini 2.5 Flash</strong> 模型進行智能辨識。</span>
+            <span>系統使用高效能 <strong>Gemini 3.5 Flash</strong> 模型進行智能辨識。</span>
           </li>
           <li style={{ marginBottom: '1rem', display: 'flex', gap: '0.5rem' }}>
             <span style={{ color: 'var(--google-yellow)' }}>⏳</span>
@@ -389,8 +391,19 @@ export default function HomePage() {
 
             {/* GAS URL */}
             <div>
-              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.35rem', color: 'var(--text-primary)' }}>
-                Google Calendar GAS URL (選填，留空可直接於第四步下載 .ics 檔案)
+              <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.35rem', color: 'var(--text-primary)' }}>
+                <span>Google Calendar GAS URL (選填)</span>
+                <button
+                  type="button"
+                  onClick={() => setShowGasModal(true)}
+                  style={{
+                    background: 'none', border: 'none', padding: 0,
+                    color: 'var(--google-blue)', textDecoration: 'underline',
+                    fontSize: '0.82rem', cursor: 'pointer', fontWeight: 'normal'
+                  }}
+                >
+                  👉 查看 GAS 程式碼與部署教學 ↗
+                </button>
               </label>
               <input
                 type="text"
@@ -568,6 +581,268 @@ export default function HomePage() {
           )}
         </div>
       </main>
+
+      {/* GAS 設定彈出式 Modal 教學 */}
+      {showGasModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
+          backgroundColor: 'rgba(0, 0, 0, 0.45)',
+          backdropFilter: 'blur(6px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 1000,
+        }}>
+          <div style={{
+            backgroundColor: 'var(--bg-primary)',
+            width: '90%',
+            maxWidth: '750px',
+            maxHeight: '85vh',
+            borderRadius: '12px',
+            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.25)',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            border: '1px solid var(--border-subtle)',
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              padding: '1.2rem 1.5rem',
+              borderBottom: '1px solid var(--border-subtle)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              backgroundColor: 'var(--bg-secondary)'
+            }}>
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span>📅</span> Google Apps Script (GAS) 部署與設定教學
+              </h3>
+              <button
+                onClick={() => setShowGasModal(false)}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  fontSize: '1.5rem', color: 'var(--text-secondary)',
+                  padding: '0.2rem'
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div style={{ padding: '1.5rem', overflowY: 'auto', flex: 1, fontSize: '0.88rem', lineHeight: 1.6, color: 'var(--text-secondary)' }}>
+              
+              <div style={{ backgroundColor: 'var(--bg-secondary)', padding: '1rem', borderRadius: '8px', borderLeft: '4px solid var(--google-blue)', marginBottom: '1.5rem' }}>
+                <p style={{ margin: 0, fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.92rem' }}>💡 什麼是 GAS 日曆對接？</p>
+                <p style={{ margin: '0.35rem 0 0 0', fontSize: '0.85rem' }}>
+                  透過將以下程式碼部署為 Google Web App，本行事曆系統即可在第四步直接將解析完的日程雲端同步至您的 Google 行事曆中，無需手動匯入！
+                </p>
+              </div>
+
+              <h4 style={{ color: 'var(--text-primary)', margin: '0 0 0.5rem 0', fontWeight: 700 }}>第一步：複製並建立 GAS 腳本</h4>
+              <ol style={{ margin: '0 0 1.2rem 0', paddingLeft: '1.2rem' }}>
+                <li style={{ marginBottom: '0.35rem' }}>打開瀏覽器前往 <a href="https://script.google.com/" target="_blank" rel="noreferrer" style={{ color: 'var(--google-blue)', textDecoration: 'underline' }}>Google Apps Script ↗</a> 並登入您的 Google 帳戶。</li>
+                <li style={{ marginBottom: '0.35rem' }}>點擊左上角「新增專案」，清空預設的 <code>myFunction</code> 代碼。</li>
+                <li style={{ marginBottom: '0.35rem' }}>複製下方框內的完整腳本代碼，並貼入編輯器中。</li>
+              </ol>
+
+              {/* 程式碼複製區 */}
+              <div style={{ position: 'relative', marginBottom: '1.5rem', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-subtle)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--bg-secondary)', padding: '0.5rem 1rem', borderBottom: '1px solid var(--border-subtle)' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>calendar.js (GAS 腳本)</span>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(GAS_CODE_TEMPLATE);
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 2000);
+                    }}
+                    style={{
+                      padding: '0.3rem 0.75rem',
+                      backgroundColor: copied ? 'var(--google-green)' : 'var(--google-blue)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    {copied ? '✓ 已複製！' : '📋 複製完整程式碼'}
+                  </button>
+                </div>
+                <pre style={{
+                  margin: 0, padding: '1rem',
+                  backgroundColor: '#1e1e1e', color: '#d4d4d4',
+                  fontSize: '0.8rem', overflowX: 'auto',
+                  maxHeight: '220px', fontFamily: 'monospace'
+                }}>
+                  {GAS_CODE_TEMPLATE}
+                </pre>
+              </div>
+
+              <h4 style={{ color: 'var(--text-primary)', margin: '0 0 0.5rem 0', fontWeight: 700 }}>第二步：設定您的安全驗證金鑰 (選填)</h4>
+              <p style={{ margin: '0 0 0.8rem 0' }}>
+                為了保障您的日曆隱私，建議在程式碼最下方的 <code>setupSecretKey</code> 函數中，將 <code>'YOUR_SECRET_KEY'</code> 替換成您自訂的一串密碼密鑰（例如：<code>'mySecureCalendarKey2026'</code>）。
+                接著，在上方工具列選擇該函數並點擊「執行 ▶️」一次即可將密碼永久加密存入您的後台！
+              </p>
+
+              <h4 style={{ color: 'var(--text-primary)', margin: '0 0 0.5rem 0', fontWeight: 700 }}>第三步：部署為 Web App 並取得對接網址</h4>
+              <ol style={{ margin: '0 0 0.5rem 0', paddingLeft: '1.2rem' }}>
+                <li style={{ marginBottom: '0.35rem' }}>點擊右上角「部署」 ➜ 「新增部署」。</li>
+                <li style={{ marginBottom: '0.35rem' }}>點擊左側類型齒輪，選擇「網頁應用程式 (Web App)」。</li>
+                <li style={{ marginBottom: '0.35rem' }}><strong>委託產生的主體 (Execute as)</strong> 選擇：<strong>「我 (Me)」</strong>。</li>
+                <li style={{ marginBottom: '0.35rem' }}><strong>誰有權限存取 (Who has access)</strong> 選擇：<strong>「任何人 (Anyone)」</strong> *(有安全金鑰防護，請放心)*。</li>
+                <li style={{ marginBottom: '0.35rem' }}>點擊「部署」，在授權認證視窗中一路點選「允許」與「繼續執行」。</li>
+                <li style={{ marginBottom: '0.35rem' }}>部署完成後，複製畫面上產出的「網頁應用程式 URL」並貼回本系統首頁的 GAS URL 輸入框中即大功告成！</li>
+              </ol>
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{
+              padding: '1rem 1.5rem',
+              borderTop: '1px solid var(--border-subtle)',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              backgroundColor: 'var(--bg-secondary)'
+            }}>
+              <button
+                onClick={() => setShowGasModal(false)}
+                style={{
+                  padding: '0.5rem 1.5rem',
+                  backgroundColor: 'var(--google-blue)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s'
+                }}
+              >
+                我知道了，關閉教學
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
+
+// ── Google Apps Script (GAS) 部署程式碼範本 ──────────────────────
+const GAS_CODE_TEMPLATE = `// ============================================================
+// Google Apps Script - Calendar 操作腳本
+// 複製此程式碼到 script.google.com 並部署為 Web App
+// ============================================================
+
+function doPost(e) {
+  try {
+    const data = JSON.parse(e.postData.contents);
+    const SECRET_KEY = PropertiesService.getScriptProperties().getProperty('SECRET_KEY');
+    if (SECRET_KEY && data.secretKey !== SECRET_KEY) {
+      return buildResponse(403, { error: '驗證失敗' });
+    }
+    const action = data.action;
+    if (action === 'addEvent') {
+      return handleAddEvent(data.event);
+    } else if (action === 'addEvents') {
+      return handleAddEvents(data.events);
+    } else if (action === 'deleteEvent') {
+      return handleDeleteEvent(data.eventId);
+    } else if (action === 'listEvents') {
+      return handleListEvents(data.startDate, data.endDate);
+    } else {
+      return buildResponse(400, { error: '未知的 action: ' + action });
+    }
+  } catch (err) {
+    return buildResponse(500, { error: err.message });
+  }
+}
+
+function handleAddEvent(event) {
+  if (!event) return buildResponse(400, { error: '缺少 event 資料' });
+  const calendar = CalendarApp.getDefaultCalendar();
+  const startTime = new Date(event.startTime);
+  const endTime = new Date(event.endTime);
+  let calEvent;
+  if (event.isAllDay) {
+    calEvent = calendar.createAllDayEvent(
+      event.title,
+      startTime,
+      { description: event.description || '', location: event.location || '' }
+    );
+  } else {
+    calEvent = calendar.createEvent(
+      event.title,
+      startTime,
+      endTime,
+      { description: event.description || '', location: event.location || '' }
+    );
+  }
+  return buildResponse(200, {
+    success: true,
+    eventId: calEvent.getId(),
+    title: calEvent.getTitle(),
+    message: '事件已成功加入 Google 行事曆'
+  });
+}
+
+function handleAddEvents(events) {
+  if (!events || !Array.isArray(events)) {
+    return buildResponse(400, { error: '缺少 events 陣列' });
+  }
+  const results = [];
+  const errors = [];
+  events.forEach(function(event, index) {
+    try {
+      const response = handleAddEvent(event);
+      const result = JSON.parse(response.getContent());
+      results.push({ index: index, ...result });
+    } catch (err) {
+      errors.push({ index: index, error: err.message });
+    }
+  });
+  return buildResponse(200, {
+    success: true,
+    added: results.length,
+    errors: errors,
+    results: results
+  });
+}
+
+function handleDeleteEvent(eventId) {
+  if (!eventId) return buildResponse(400, { error: '缺少 eventId' });
+  const calendar = CalendarApp.getDefaultCalendar();
+  const event = calendar.getEventById(eventId);
+  if (!event) return buildResponse(404, { error: '找不到指定事件' });
+  event.deleteEvent();
+  return buildResponse(200, { success: true, message: '事件已刪除' });
+}
+
+function handleListEvents(startDate, endDate) {
+  const calendar = CalendarApp.getDefaultCalendar();
+  const start = startDate ? new Date(startDate) : new Date();
+  const end = endDate ? new Date(endDate) : new Date(start.getTime() + 30 * 24 * 60 * 60 * 1000);
+  const events = calendar.getEvents(start, end);
+  const eventList = events.map(function(event) {
+    return {
+      id: event.getId(),
+      title: event.getTitle(),
+      startTime: event.getStartTime().toISOString(),
+      endTime: event.getEndTime().toISOString(),
+      description: event.getDescription(),
+      location: event.getLocation()
+    };
+  });
+  return buildResponse(200, { success: true, events: eventList });
+}
+
+function buildResponse(statusCode, data) {
+  const output = ContentService.createTextOutput(JSON.stringify(data));
+  output.setMimeType(ContentService.MimeType.JSON);
+  return output;
+}
+
+function setupSecretKey() {
+  PropertiesService.getScriptProperties().setProperty('SECRET_KEY', 'YOUR_SECRET_KEY');
+  Logger.log('密鑰設定完成');
+}`;
