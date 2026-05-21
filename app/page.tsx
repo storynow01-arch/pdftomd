@@ -45,6 +45,56 @@ export default function HomePage() {
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState('');
 
+  // ── 自訂憑證 state ─────────────────────────────────────────
+  const [geminiApiKey, setGeminiApiKey] = useState('');
+  const [notionToken, setNotionToken] = useState('');
+  const [notionPageId, setNotionPageId] = useState('');
+  const [gasUrl, setGasUrl] = useState('');
+  const [gasSecretKey, setGasSecretKey] = useState('');
+  const [isAccordionOpen, setIsAccordionOpen] = useState(false);
+
+  const [showGemini, setShowGemini] = useState(false);
+  const [showNotionToken, setShowNotionToken] = useState(false);
+  const [showGasSecret, setShowGasSecret] = useState(false);
+
+  useEffect(() => {
+    const savedGemini = localStorage.getItem('pdftomd_gemini_api_key') || '';
+    const savedNotionToken = localStorage.getItem('pdftomd_notion_token') || '';
+    const savedNotionPageId = localStorage.getItem('pdftomd_notion_page_id') || '';
+    const savedGasUrl = localStorage.getItem('pdftomd_gas_url') || '';
+    const savedGasSecret = localStorage.getItem('pdftomd_gas_secret_key') || '';
+
+    setGeminiApiKey(savedGemini);
+    setNotionToken(savedNotionToken);
+    setNotionPageId(savedNotionPageId);
+    setGasUrl(savedGasUrl);
+    setGasSecretKey(savedGasSecret);
+
+    // 如果沒有 Gemini API key，預設展開 API 設定面板進行引導
+    if (!savedGemini) {
+      setIsAccordionOpen(true);
+    }
+  }, []);
+
+  const handleKeyChange = (key: string, value: string) => {
+    if (key === 'gemini') {
+      setGeminiApiKey(value);
+      localStorage.setItem('pdftomd_gemini_api_key', value);
+    } else if (key === 'notion_token') {
+      setNotionToken(value);
+      localStorage.setItem('pdftomd_notion_token', value);
+    } else if (key === 'notion_page_id') {
+      setNotionPageId(value);
+      localStorage.setItem('pdftomd_notion_page_id', value);
+    } else if (key === 'gas_url') {
+      setGasUrl(value);
+      localStorage.setItem('pdftomd_gas_url', value);
+    } else if (key === 'gas_secret_key') {
+      setGasSecretKey(value);
+      localStorage.setItem('pdftomd_gas_secret_key', value);
+    }
+  };
+
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
@@ -133,6 +183,11 @@ export default function HomePage() {
     try {
       const formData = new FormData();
       formData.append('file', file);
+      
+      if (geminiApiKey.trim()) {
+        formData.append('customGeminiApiKey', geminiApiKey.trim());
+      }
+      
       const res = await fetch('/api/pdf/parse', { method: 'POST', body: formData });
       const data = await res.json();
       
@@ -204,6 +259,10 @@ export default function HomePage() {
           <li style={{ marginBottom: '1rem', display: 'flex', gap: '0.5rem' }}>
             <span style={{ color: 'var(--google-green)' }}>🔄</span>
             <span>流程：預覽校對 ➔ 單位複選 ➔ 同步 Notion ➔ 匯入行事曆。</span>
+          </li>
+          <li style={{ marginBottom: '1rem', display: 'flex', gap: '0.5rem' }}>
+            <span style={{ color: 'var(--google-blue)' }}>🔒</span>
+            <span>自訂 API 金鑰 100% 儲存於您本地瀏覽器 (localStorage)，安全且不經由本站伺服器轉存。</span>
           </li>
         </ul>
 
@@ -287,6 +346,196 @@ export default function HomePage() {
                   borderRadius: '4px',
                   transition: 'width 0.3s ease'
                 }} />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 自訂金鑰設定折疊面板 */}
+        <div className="card" style={{ marginTop: '1.5rem', padding: '1.2rem', transition: 'all 0.3s ease' }}>
+          <div 
+            onClick={() => setIsAccordionOpen(!isAccordionOpen)}
+            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', userSelect: 'none' }}
+          >
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
+              <span>🔧</span> 個人 API 設定 (自訂金鑰免部署)
+            </h3>
+            <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)', transform: isAccordionOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }}>
+              ▼
+            </span>
+          </div>
+
+          {isAccordionOpen && (
+            <div style={{ marginTop: '1.2rem', display: 'flex', flexDirection: 'column', gap: '1rem', animation: 'fadeIn 0.2s ease-out' }}>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.5, margin: '0 0 0.5rem 0', backgroundColor: 'var(--bg-secondary)', padding: '0.75rem', borderRadius: '6px', borderLeft: '3px solid var(--google-blue)' }}>
+                💡 <strong>為什麼要填寫？</strong> 為了讓本系統對所有人開放自由使用，且不需要任何個人 Vercel 部署程序，您可以自訂個人的 API 金鑰。所有金鑰<strong>皆僅儲存於您本地瀏覽器</strong>，伺服器絕不上傳收集，請放心使用。
+              </p>
+
+              {/* Gemini API Key */}
+              <div>
+                <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.4rem', color: 'var(--text-primary)' }}>
+                  <span>Gemini API Key (自訂解析金鑰)</span>
+                  <a 
+                    href="https://aistudio.google.com/" 
+                    target="_blank" 
+                    rel="noreferrer" 
+                    style={{ color: 'var(--google-blue)', textDecoration: 'underline', fontWeight: 'normal' }}
+                  >
+                    免費申請 Gemini 憑證 ↗
+                  </a>
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={showGemini ? 'text' : 'password'}
+                    value={geminiApiKey}
+                    onChange={(e) => handleKeyChange('gemini', e.target.value)}
+                    placeholder="請輸入 Gemini API 金鑰 (AIzaSy...，留空則採用伺服器預設)"
+                    style={{
+                      width: '100%',
+                      padding: '0.5rem 2.5rem 0.5rem 0.75rem',
+                      border: '1px solid var(--border-subtle)',
+                      borderRadius: '6px',
+                      fontSize: '0.9rem',
+                      outline: 'none',
+                      backgroundColor: 'var(--bg-primary)',
+                      color: 'var(--text-primary)',
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowGemini(!showGemini)}
+                    style={{
+                      position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)',
+                      background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', opacity: 0.6
+                    }}
+                  >
+                    {showGemini ? '👁️' : '🙈'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Notion Token */}
+              <div>
+                <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.4rem', color: 'var(--text-primary)' }}>
+                  <span>Notion Integration Token (寫入 Notion 時必填)</span>
+                  <a 
+                    href="https://www.notion.so/my-integrations" 
+                    target="_blank" 
+                    rel="noreferrer" 
+                    style={{ color: 'var(--google-blue)', textDecoration: 'underline', fontWeight: 'normal' }}
+                  >
+                    建立 Notion 整合 ↗
+                  </a>
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={showNotionToken ? 'text' : 'password'}
+                    value={notionToken}
+                    onChange={(e) => handleKeyChange('notion_token', e.target.value)}
+                    placeholder="請輸入 Notion 整合 Token (secret_...)"
+                    style={{
+                      width: '100%',
+                      padding: '0.5rem 2.5rem 0.5rem 0.75rem',
+                      border: '1px solid var(--border-subtle)',
+                      borderRadius: '6px',
+                      fontSize: '0.9rem',
+                      outline: 'none',
+                      backgroundColor: 'var(--bg-primary)',
+                      color: 'var(--text-primary)',
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNotionToken(!showNotionToken)}
+                    style={{
+                      position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)',
+                      background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', opacity: 0.6
+                    }}
+                  >
+                    {showNotionToken ? '👁️' : '🙈'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Notion Page ID */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.4rem', color: 'var(--text-primary)' }}>
+                  Notion Page ID (寫入 Notion 時必填，須先將此頁面與 Notion 整合共享連結)
+                </label>
+                <input
+                  type="text"
+                  value={notionPageId}
+                  onChange={(e) => handleKeyChange('notion_page_id', e.target.value)}
+                  placeholder="請輸入 Notion 父頁面 ID (32位十六進位字元)"
+                  style={{
+                    width: '100%',
+                    padding: '0.5rem 0.75rem',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: '6px',
+                    fontSize: '0.9rem',
+                    outline: 'none',
+                    backgroundColor: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                  }}
+                />
+              </div>
+
+              {/* GAS URL */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.4rem', color: 'var(--text-primary)' }}>
+                  Google Calendar GAS Web App URL (選填，若留空可直接在第四步下載 .ics 檔案一鍵匯入)
+                </label>
+                <input
+                  type="text"
+                  value={gasUrl}
+                  onChange={(e) => handleKeyChange('gas_url', e.target.value)}
+                  placeholder="請輸入 GAS 網頁應用程式 URL (https://script.google.com/...)"
+                  style={{
+                    width: '100%',
+                    padding: '0.5rem 0.75rem',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: '6px',
+                    fontSize: '0.9rem',
+                    outline: 'none',
+                    backgroundColor: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                  }}
+                />
+              </div>
+
+              {/* GAS Secret Key */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.4rem', color: 'var(--text-primary)' }}>
+                  GAS Secret Key (選填，配合 GAS 驗證使用的安全金鑰)
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={showGasSecret ? 'text' : 'password'}
+                    value={gasSecretKey}
+                    onChange={(e) => handleKeyChange('gas_secret_key', e.target.value)}
+                    placeholder="請輸入 GAS Secret Key"
+                    style={{
+                      width: '100%',
+                      padding: '0.5rem 2.5rem 0.5rem 0.75rem',
+                      border: '1px solid var(--border-subtle)',
+                      borderRadius: '6px',
+                      fontSize: '0.9rem',
+                      outline: 'none',
+                      backgroundColor: 'var(--bg-primary)',
+                      color: 'var(--text-primary)',
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowGasSecret(!showGasSecret)}
+                    style={{
+                      position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)',
+                      background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', opacity: 0.6
+                    }}
+                  >
+                    {showGasSecret ? '👁️' : '🙈'}
+                  </button>
+                </div>
               </div>
             </div>
           )}

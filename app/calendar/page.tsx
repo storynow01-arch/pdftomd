@@ -214,6 +214,7 @@ export default function CalendarPage() {
   const [error, setError] = useState('');
   const [searchKeyword, setSearchKeyword] = useState('');
   const [activeUnit, setActiveUnit] = useState<string>('全部'); // 當前選中的單位分頁
+  const [gasKeySource, setGasKeySource] = useState<'local' | 'default'>('default');
 
   // 從事件中提取所有單位名稱
   const units = useMemo(() => {
@@ -259,6 +260,15 @@ export default function CalendarPage() {
     const parsed = parseEventsFromMarkdown(md);
     setEvents(parsed);
     setSelected(new Set(parsed.map((e) => e.id)));
+
+    // 檢查本地是否有 GAS Web App URL 與 Secret Key
+    const savedGasUrl = localStorage.getItem('pdftomd_gas_url') || '';
+    const savedGasSecret = localStorage.getItem('pdftomd_gas_secret_key') || '';
+    if (savedGasUrl.trim() && savedGasSecret.trim()) {
+      setGasKeySource('local');
+    } else {
+      setGasKeySource('default');
+    }
   }, [router]);
 
   const toggleSelect = useCallback((id: string) => {
@@ -292,10 +302,17 @@ export default function CalendarPage() {
     setLoading(true);
     setError('');
     try {
+      const customGasUrl = localStorage.getItem('pdftomd_gas_url') || '';
+      const customGasSecretKey = localStorage.getItem('pdftomd_gas_secret_key') || '';
+
       const res = await fetch('/api/calendar/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ events: toSync }),
+        body: JSON.stringify({ 
+          events: toSync,
+          customGasUrl: customGasUrl.trim() || undefined,
+          customGasSecretKey: customGasSecretKey.trim() || undefined,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -391,6 +408,14 @@ export default function CalendarPage() {
           <li style={{ marginBottom: '1rem', display: 'flex', gap: '0.5rem' }}>
             <span style={{ color: 'var(--google-blue)' }}>📋</span>
             <span>使用分頁切換不同單位的事件。</span>
+          </li>
+          <li style={{ marginBottom: '1.5rem', marginTop: '1.5rem', padding: '0.75rem', backgroundColor: 'var(--bg-secondary)', borderRadius: '8px', borderLeft: `4px solid ${gasKeySource === 'local' ? 'var(--google-green)' : 'var(--google-yellow)'}`, fontSize: '0.88rem', listStyleType: 'none' }}>
+            <div style={{ fontWeight: 'bold', marginBottom: '0.25rem', color: 'var(--text-primary)' }}>GAS 日曆同步狀態</div>
+            {gasKeySource === 'local' ? (
+              <span style={{ color: 'var(--google-green)', display: 'block', lineHeight: '1.4' }}>🟢 已偵測到本地自訂 GAS 憑證，可點擊「加入 Google 日曆 (GAS)」直接進行雲端同步。</span>
+            ) : (
+              <span style={{ color: 'var(--text-secondary)', display: 'block', lineHeight: '1.4' }}>🟡 未偵測到本地自訂 GAS，無法直接同步雲端。推薦點擊「📥 下載 .ics 檔案」一鍵匯入個人日曆，免寫程式超方便！</span>
+            )}
           </li>
         </ul>
         

@@ -1,21 +1,26 @@
 import { Client } from '@notionhq/client';
 import { NextRequest, NextResponse } from 'next/server';
 
-const notion = new Client({ auth: process.env.NOTION_TOKEN });
-
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { markdown, title } = body;
+    const { markdown, title, customNotionToken, customNotionPageId } = body;
 
     if (!markdown) {
       return NextResponse.json({ error: '缺少 markdown 內容' }, { status: 400 });
     }
 
-    if (!process.env.NOTION_PAGE_ID) {
-      return NextResponse.json({ error: '未設定 NOTION_PAGE_ID' }, { status: 500 });
+    const token = (customNotionToken && customNotionToken.trim()) || process.env.NOTION_TOKEN;
+    if (!token) {
+      return NextResponse.json({ error: '未設定 Notion Token (請先在設定面板填寫，或部署環境變數)' }, { status: 400 });
     }
 
+    const pageIdTarget = (customNotionPageId && customNotionPageId.trim()) || process.env.NOTION_PAGE_ID;
+    if (!pageIdTarget) {
+      return NextResponse.json({ error: '未設定 Notion Page ID (請先在設定面板填寫，或部署環境變數)' }, { status: 400 });
+    }
+
+    const notion = new Client({ auth: token });
     const pageTitle = title || `行事曆解析 - ${new Date().toLocaleDateString('zh-TW')}`;
 
     // 解析 Markdown 成結構化資料：[{ unitName, events: [{ eventTitle, detailLines[] }] }]
@@ -23,7 +28,7 @@ export async function POST(request: NextRequest) {
 
     // Step 1：建立空頁面（不含任何 children，避免超過 1000 block 限制）
     const response = await notion.pages.create({
-      parent: { type: 'page_id', page_id: process.env.NOTION_PAGE_ID },
+      parent: { type: 'page_id', page_id: pageIdTarget },
       properties: {
         title: {
           title: [{ type: 'text', text: { content: pageTitle } }],

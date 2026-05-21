@@ -3,19 +3,19 @@ import { NextRequest, NextResponse } from 'next/server';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { events } = body;
+    const { events, customGasUrl, customGasSecretKey } = body;
 
     if (!events || !Array.isArray(events) || events.length === 0) {
       return NextResponse.json({ error: '請提供至少一個事件' }, { status: 400 });
     }
 
-    const gasUrl = process.env.GAS_CALENDAR_URL;
-    const secretKey = process.env.GAS_SECRET_KEY;
+    const gasUrl = (customGasUrl && customGasUrl.trim()) || process.env.GAS_CALENDAR_URL;
+    const secretKey = (customGasSecretKey && customGasSecretKey.trim()) || process.env.GAS_SECRET_KEY;
 
     if (!gasUrl) {
       return NextResponse.json(
-        { error: '未設定 GAS_CALENDAR_URL，請參考 gas/README.md 完成設定' },
-        { status: 500 }
+        { error: '未設定 Google 日曆 GAS Web App URL，請先在首頁設定面板填寫，或完成環境變數部署。' },
+        { status: 400 }
       );
     }
 
@@ -55,16 +55,18 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    const gasUrl = process.env.GAS_CALENDAR_URL;
-    const secretKey = process.env.GAS_SECRET_KEY;
-
-    if (!gasUrl) {
-      return NextResponse.json({ error: '未設定 GAS_CALENDAR_URL' }, { status: 500 });
-    }
-
     const { searchParams } = new URL(request.url);
+    const customGasUrl = searchParams.get('customGasUrl');
+    const customGasSecretKey = searchParams.get('customGasSecretKey');
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
+
+    const gasUrl = (customGasUrl && customGasUrl.trim()) || process.env.GAS_CALENDAR_URL;
+    const secretKey = (customGasSecretKey && customGasSecretKey.trim()) || process.env.GAS_SECRET_KEY;
+
+    if (!gasUrl) {
+      return NextResponse.json({ error: '未設定 Google 日曆 GAS Web App URL，請先在首頁設定面板填寫，或完成環境變數部署。' }, { status: 400 });
+    }
 
     const response = await fetch(gasUrl, {
       method: 'POST',

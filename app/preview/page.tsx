@@ -65,6 +65,7 @@ export default function PreviewPage() {
   const [success, setSuccess] = useState('');
   const [searchKeyword, setSearchKeyword] = useState('');
   const [accuracy, setAccuracy] = useState<{ score: number; level: string; reason: string; issues: string[] } | null>(null);
+  const [notionKeySource, setNotionKeySource] = useState<'local' | 'default'>('default');
 
   // ── 複選狀態：空 Set = 全部模式 ──────────────────────────────
   const [selectedUnits, setSelectedUnits] = useState<Set<string>>(new Set());
@@ -110,6 +111,15 @@ export default function PreviewPage() {
         console.error('解析 parsedAccuracy 失敗:', e);
       }
     }
+
+    // 檢查本地是否有 Notion Token 與 Page ID
+    const savedToken = localStorage.getItem('pdftomd_notion_token') || '';
+    const savedPageId = localStorage.getItem('pdftomd_notion_page_id') || '';
+    if (savedToken.trim() && savedPageId.trim()) {
+      setNotionKeySource('local');
+    } else {
+      setNotionKeySource('default');
+    }
   }, [router]);
 
   // 當前顯示內容
@@ -151,10 +161,19 @@ export default function PreviewPage() {
     const markdown = getSelectedMarkdown(); // 只寫所選單位
     try {
       const title = `行事曆解析 - ${filename} - ${new Date().toLocaleDateString('zh-TW')}`;
+      
+      const customNotionToken = localStorage.getItem('pdftomd_notion_token') || '';
+      const customNotionPageId = localStorage.getItem('pdftomd_notion_page_id') || '';
+
       const res = await fetch('/api/notion/write', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ markdown, title }),
+        body: JSON.stringify({ 
+          markdown, 
+          title,
+          customNotionToken: customNotionToken.trim() || undefined,
+          customNotionPageId: customNotionPageId.trim() || undefined,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -217,6 +236,14 @@ export default function PreviewPage() {
           <li style={{ marginBottom: '1rem', display: 'flex', gap: '0.5rem' }}>
             <span style={{ color: 'var(--google-blue)' }}>🔲</span>
             <span>可複選單位，只寫入所選單位至 Notion。</span>
+          </li>
+          <li style={{ marginBottom: '1.5rem', marginTop: '1.5rem', padding: '0.75rem', backgroundColor: 'var(--bg-secondary)', borderRadius: '8px', borderLeft: `4px solid ${notionKeySource === 'local' ? 'var(--google-green)' : 'var(--google-yellow)'}`, fontSize: '0.88rem', listStyleType: 'none' }}>
+            <div style={{ fontWeight: 'bold', marginBottom: '0.25rem', color: 'var(--text-primary)' }}>Notion 寫入狀態</div>
+            {notionKeySource === 'local' ? (
+              <span style={{ color: 'var(--google-green)', display: 'block', lineHeight: '1.4' }}>🟢 已偵測到本地自訂憑證，將寫入您的個人 Notion。</span>
+            ) : (
+              <span style={{ color: 'var(--text-secondary)', display: 'block', lineHeight: '1.4' }}>🟡 未偵測到本地自訂憑證，將嘗試採用伺服器預設環境變數。若寫入失敗，請返回首頁「個人 API 設定」填寫。</span>
+            )}
           </li>
         </ul>
         <div style={{ marginTop: '2rem' }}>

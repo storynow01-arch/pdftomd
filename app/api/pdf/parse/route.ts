@@ -226,6 +226,7 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     const file = formData.get('file') as File;
+    const customGeminiApiKey = formData.get('customGeminiApiKey') as string | null;
 
     if (!file) {
       return NextResponse.json({ error: '請上傳 PDF 檔案' }, { status: 400 });
@@ -257,7 +258,9 @@ export async function POST(request: NextRequest) {
     
     // 獨立出單次解析函式
     const runParsingPass = async (modelName: string): Promise<{ accuracy: any, events: CalendarEvent[] }> => {
-      const ai = getNextAIClient();
+      const ai = customGeminiApiKey && customGeminiApiKey.trim()
+        ? new GoogleGenAI({ apiKey: customGeminiApiKey.trim() })
+        : getNextAIClient();
       const response = await ai.models.generateContent({
         model: modelName,
         contents: [
