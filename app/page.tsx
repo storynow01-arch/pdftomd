@@ -505,6 +505,49 @@ export default function HomePage() {
               ⚠️ {error}
             </div>
           )}
+
+          {/* 開始解析按鈕 */}
+          {!loading && (
+            <button
+              onClick={handleParse}
+              disabled={!file}
+              style={{
+                width: '100%',
+                padding: '0.75rem 1.5rem',
+                marginTop: '1.2rem',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '1rem',
+                fontWeight: 600,
+                cursor: file ? 'pointer' : 'not-allowed',
+                backgroundColor: file ? 'var(--google-blue)' : 'var(--bg-secondary)',
+                color: file ? 'white' : 'var(--text-muted)',
+                boxShadow: file ? '0 4px 12px rgba(66, 133, 244, 0.25)' : 'none',
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.5rem'
+              }}
+              onMouseEnter={(e) => {
+                if (file) {
+                  e.currentTarget.style.backgroundColor = '#1a73e8';
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                  e.currentTarget.style.boxShadow = '0 6px 16px rgba(66, 133, 244, 0.35)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (file) {
+                  e.currentTarget.style.backgroundColor = 'var(--google-blue)';
+                  e.currentTarget.style.transform = 'none';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(66, 133, 244, 0.25)';
+                }
+              }}
+            >
+              <span>🚀 開始解析行事曆</span>
+              <span>→</span>
+            </button>
+          )}
           
           {/* 百分比進度條 */}
           {loading && (
