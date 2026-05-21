@@ -68,35 +68,63 @@ export default function HomePage() {
   };
 
   const [progressText, setProgressText] = useState('');
+  const [elapsedTime, setElapsedTime] = useState(0);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
+    let timer: NodeJS.Timeout;
+
     if (loading) {
       setProgress(0);
-      setProgressText('正在平行發送初次解析請求...');
-      
+      setElapsedTime(0);
+      setProgressText('🚀 正在讀取 PDF 並進行本地純文字提取...');
+
+      // 累計秒數計時器
+      timer = setInterval(() => {
+        setElapsedTime((prev) => prev + 1);
+      }, 1000);
+
+      // 進度增長計時器
       interval = setInterval(() => {
         setProgress((prev) => {
           if (prev >= 95) return 95;
-          // 對數遞減增長：越靠近 95 增加越慢
-          // 期望在前 15 秒達到 60%，在後 30 秒慢慢從 60% 爬到 95%
           const remaining = 95 - prev;
           const increment = (remaining * 0.05) + (Math.random() * 0.5);
-          const newProgress = Math.min(prev + increment, 95);
-          
-          if (newProgress > 60 && prev <= 60) {
-            setProgressText('正在進行 AI 交叉比對以提高準確率...');
-          }
-          
-          return newProgress;
+          return Math.min(prev + increment, 95);
         });
       }, 500);
     } else {
       setProgress(0);
+      setElapsedTime(0);
       setProgressText('');
     }
-    return () => clearInterval(interval);
+
+    return () => {
+      clearInterval(interval);
+      clearInterval(timer);
+    };
   }, [loading]);
+
+  // 動態依據耗時更新溫馨提示文字
+  useEffect(() => {
+    if (!loading) return;
+    if (progress === 100) {
+      setProgressText('🎉 解析完成，即將跳轉...');
+      return;
+    }
+
+    if (elapsedTime <= 8) {
+      setProgressText('🚀 正在讀取 PDF 並進行本地純文字提取...');
+    } else if (elapsedTime <= 18) {
+      setProgressText('🧠 正在使用 Gemini 3.5 Flash 進行智慧解析...');
+    } else if (elapsedTime <= 30) {
+      setProgressText('✨ 正在進行深度語意分析與處室分類（已耗時：' + elapsedTime + ' 秒）...');
+    } else if (elapsedTime <= 45) {
+      setProgressText('🔍 偵測到事件數量較多，正在進行最後的格式校校（已耗時：' + elapsedTime + ' 秒）...');
+    } else {
+      setProgressText('⏳ 請耐心等候，AI 正在將數百項日程做高精確度的整理（已耗時：' + elapsedTime + ' 秒）...');
+    }
+  }, [elapsedTime, loading, progress]);
 
   const handleParse = async () => {
     if (!file) return;
@@ -118,6 +146,12 @@ export default function HomePage() {
         // 存入 sessionStorage，傳給下一頁
         sessionStorage.setItem('parsedMarkdown', data.markdown);
         sessionStorage.setItem('sourceFilename', data.filename);
+        
+        if (data.accuracy) {
+          sessionStorage.setItem('parsedAccuracy', JSON.stringify(data.accuracy));
+        } else {
+          sessionStorage.removeItem('parsedAccuracy');
+        }
         
         // 如果使用了備用模型，把資訊存入，讓前端顯示警告
         if (data.isFallback) {

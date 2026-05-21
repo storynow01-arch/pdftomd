@@ -64,6 +64,7 @@ export default function PreviewPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [searchKeyword, setSearchKeyword] = useState('');
+  const [accuracy, setAccuracy] = useState<{ score: number; level: string; reason: string; issues: string[] } | null>(null);
 
   // ── 複選狀態：空 Set = 全部模式 ──────────────────────────────
   const [selectedUnits, setSelectedUnits] = useState<Set<string>>(new Set());
@@ -100,6 +101,15 @@ export default function PreviewPage() {
     });
     setSections(parsedSections);
     setFilename(fn || 'document.pdf');
+
+    const accuracyStr = sessionStorage.getItem('parsedAccuracy');
+    if (accuracyStr) {
+      try {
+        setAccuracy(JSON.parse(accuracyStr));
+      } catch (e) {
+        console.error('解析 parsedAccuracy 失敗:', e);
+      }
+    }
   }, [router]);
 
   // 當前顯示內容
@@ -219,6 +229,101 @@ export default function PreviewPage() {
       {/* Notes */}
       <main className="cornell-notes">
         <div className="card" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+
+          {/* ── AI 解析精確度儀表板 ─────────────────────────────── */}
+          {accuracy && (
+            <div style={{
+              display: 'flex',
+              gap: '1.5rem',
+              padding: '1.25rem',
+              borderRadius: '12px',
+              backgroundColor: 'var(--bg-secondary)',
+              borderLeft: `5px solid ${
+                accuracy.score >= 90 ? 'var(--google-green)' :
+                accuracy.score >= 70 ? 'var(--google-yellow)' : 'var(--google-red)'
+              }`,
+              boxShadow: 'inset 0 1px 2px rgba(255,255,255,0.1), 0 2px 8px rgba(0,0,0,0.04)',
+              marginBottom: '1.5rem',
+              alignItems: 'center',
+              flexWrap: 'wrap'
+            }}>
+              {/* 圓環進度條 */}
+              <div style={{ position: 'relative', width: '70px', height: '70px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <svg style={{ transform: 'rotate(-90deg)', width: '70px', height: '70px' }}>
+                  <circle
+                    cx="35" cy="35" r="28"
+                    stroke="rgba(0,0,0,0.06)" strokeWidth="6" fill="transparent"
+                  />
+                  <circle
+                    cx="35" cy="35" r="28"
+                    stroke={
+                      accuracy.score >= 90 ? 'var(--google-green)' :
+                      accuracy.score >= 70 ? 'var(--google-yellow)' : 'var(--google-red)'
+                    }
+                    strokeWidth="6" fill="transparent"
+                    strokeDasharray={`${2 * Math.PI * 28}`}
+                    strokeDashoffset={`${2 * Math.PI * 28 * (1 - accuracy.score / 100)}`}
+                    strokeLinecap="round"
+                    style={{ transition: 'stroke-dashoffset 0.8s ease-in-out' }}
+                  />
+                </svg>
+                <div style={{ position: 'absolute', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <span style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-primary)' }}>{accuracy.score}</span>
+                  <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 600, marginTop: '-2px' }}>%</span>
+                </div>
+              </div>
+
+              {/* 評估詳情 */}
+              <div style={{ flex: 1, minWidth: '200px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.4rem' }}>
+                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                    🤖 AI 解析精確度評估
+                  </h3>
+                  <span style={{
+                    padding: '0.2rem 0.6rem',
+                    borderRadius: '20px',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    backgroundColor: 
+                      accuracy.score >= 90 ? 'rgba(52, 168, 83, 0.15)' :
+                      accuracy.score >= 70 ? 'rgba(251, 188, 5, 0.15)' : 'rgba(234, 67, 53, 0.15)',
+                    color: 
+                      accuracy.score >= 90 ? 'var(--google-green)' :
+                      accuracy.score >= 70 ? 'var(--google-yellow)' : 'var(--google-red)',
+                    border: `1px solid ${
+                      accuracy.score >= 90 ? 'rgba(52, 168, 83, 0.2)' :
+                      accuracy.score >= 70 ? 'rgba(251, 188, 5, 0.2)' : 'rgba(234, 67, 53, 0.2)'
+                    }`
+                  }}>
+                    {accuracy.level}
+                  </span>
+                </div>
+                <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                  {accuracy.reason}
+                </p>
+              </div>
+
+              {/* 待注意項目 (Issues) */}
+              {accuracy.issues && accuracy.issues.length > 0 && (
+                <div style={{
+                  width: '100%',
+                  marginTop: '0.5rem',
+                  paddingTop: '0.75rem',
+                  borderTop: '1px dashed var(--border-subtle)'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.4rem' }}>
+                    <span style={{ fontSize: '0.95rem' }}>⚠️</span>
+                    <strong style={{ fontSize: '0.85rem', color: 'var(--google-red)' }}>待核對或潛在解析疑慮：</strong>
+                  </div>
+                  <ul style={{ margin: 0, paddingLeft: '1.25rem', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                    {accuracy.issues.map((issue, i) => (
+                      <li key={i} style={{ marginBottom: '0.25rem', lineHeight: 1.4 }}>{issue}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* ── 單位分頁（複選） ─────────────────────────────── */}
           {sections.length > 0 && (
